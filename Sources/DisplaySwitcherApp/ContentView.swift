@@ -64,10 +64,13 @@ private struct SidebarView: View {
 
                 ScrollView {
                     LazyVStack(spacing: 8) {
-                        ForEach(appState.groups) { group in
+                        ForEach(Array(appState.groups.enumerated()), id: \.element.id) { index, group in
                             GroupRow(group: group, isSelected: group.id == appState.selectedGroup?.id)
                                 .onTapGesture {
                                     appState.selectedGroupID = group.id
+                                }
+                                .onTapGesture(count: 2) {
+                                    appState.requestApplyGroup(at: index)
                                 }
                         }
                     }
