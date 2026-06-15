@@ -12,7 +12,7 @@ GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && ! git diff-index --quiet HEAD --; then
   GIT_COMMIT="$GIT_COMMIT-dirty"
 fi
-BUILD_TIME="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+BUILD_TIME="$(TZ=Asia/Shanghai date +"%Y-%m-%d %H:%M:%S CST")"
 
 cd "$ROOT_DIR"
 swift build -c release
