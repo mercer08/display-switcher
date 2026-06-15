@@ -126,6 +126,7 @@ struct BetterDisplayCLI {
         let objects = try decoder.decode([[String: String]].self, from: data)
         return objects.compactMap { object in
             guard object["deviceType"] == "Display" else { return nil }
+            guard !isBuiltInDisplay(object) else { return nil }
             let name = object["name"] ?? object["productName"] ?? object["originalName"] ?? "Display"
             let stableID = object["UUID"] ?? object["tagID"] ?? object["displayID"] ?? name
             return DisplayDevice(
@@ -144,6 +145,32 @@ struct BetterDisplayCLI {
                 registryLocation: object["registryLocation"]
             )
         }
+    }
+
+    private func isBuiltInDisplay(_ object: [String: String]) -> Bool {
+        let searchableText = [
+            object["name"],
+            object["originalName"],
+            object["productName"],
+            object["model"],
+            object["registryLocation"]
+        ]
+            .compactMap { $0?.lowercased() }
+            .joined(separator: " ")
+
+        let builtInMarkers = [
+            "built-in",
+            "built in",
+            "builtin",
+            "internal display",
+            "color lcd",
+            "liquid retina",
+            "retina display",
+            "applebacklightdisplay",
+            "appleclcd"
+        ]
+
+        return builtInMarkers.contains { searchableText.contains($0) }
     }
 
     private func parseInputSources(_ raw: String) -> [InputSource] {
