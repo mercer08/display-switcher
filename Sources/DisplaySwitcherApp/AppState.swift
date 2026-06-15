@@ -2,6 +2,33 @@ import AppKit
 import Foundation
 import SwiftUI
 
+private struct InputSourceSkipCheck {
+    var shouldSkip: Bool
+    var reason: String
+    var currentRawOutput: String?
+    var currentRawValue: Int?
+    var currentNormalizedValue: Int?
+    var targetValue: Int?
+    var targetName: String
+    var error: String?
+
+    func logMessage(display: DisplayDevice, rule: SwitchRule) -> String {
+        [
+            "Input source precheck",
+            "display=\(display.name)",
+            "targetSourceValue=\(rule.sourceValue)",
+            "targetSourceName=\(targetName)",
+            "targetVCP=\(targetValue.map(String.init) ?? "nil")",
+            "currentRawOutput=\(currentRawOutput ?? "nil")",
+            "currentRawValue=\(currentRawValue.map(String.init) ?? "nil")",
+            "currentVCP=\(currentNormalizedValue.map(String.init) ?? "nil")",
+            "skip=\(shouldSkip)",
+            "reason=\(reason)",
+            "error=\(error ?? "nil")"
+        ].joined(separator: ", ")
+    }
+}
+
 @MainActor
 final class AppState: ObservableObject {
     @Published var displays: [DisplayDevice] = []
@@ -24,6 +51,7 @@ final class AppState: ObservableObject {
 
     private let cli = BetterDisplayCLI()
     private let hotkeyManager = GlobalHotkeyManager()
+    private let logger = AppLogger()
     private let configurationURL: URL
 
     init() {
@@ -226,6 +254,7 @@ final class AppState: ObservableObject {
         lastError = nil
         let displayName = groupDisplayName(group)
         statusMessage = "\(t(.applyingGroup)) \(displayName)..."
+        logger.info("Apply group started: \(displayName)")
         defer { isApplying = false }
 
         var applied = 0
@@ -234,13 +263,17 @@ final class AppState: ObservableObject {
         for rule in group.rules where rule.enabled && !rule.sourceValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             guard let display = displays.first(where: { $0.id == rule.displayID }) else { continue }
             do {
-                if await shouldSkipInputSourceChange(display: display, rule: rule) {
+                let check = await inputSourceSkipCheck(display: display, rule: rule)
+                logger.info(check.logMessage(display: display, rule: rule))
+                if check.shouldSkip {
                     skipped += 1
                     continue
                 }
                 _ = try await cli.changeInputSource(display: display, sourceValue: rule.sourceValue)
+                logger.info("Set input source: display=\(display.name), targetSourceValue=\(rule.sourceValue), targetSourceName=\(rule.sourceName)")
                 applied += 1
             } catch {
+                logger.warning("Set input source failed: display=\(display.name), targetSourceValue=\(rule.sourceValue), error=\(error.localizedDescription)")
                 failures.append("\(display.name): \(error.localizedDescription)")
             }
         }
@@ -289,15 +322,47 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func shouldSkipInputSourceChange(display: DisplayDevice, rule: SwitchRule) async -> Bool {
-        guard let currentValue = try? await cli.currentInputSourceVCPValue(display: display) else {
-            return false
+    private func inputSourceSkipCheck(display: DisplayDevice, rule: SwitchRule) async -> InputSourceSkipCheck {
+        let currentResult: CurrentInputSourceVCPValue
+        do {
+            currentResult = try await cli.currentInputSourceVCPValue(display: display)
+        } catch {
+            return InputSourceSkipCheck(
+                shouldSkip: false,
+                reason: "current-read-failed",
+                currentRawOutput: nil,
+                currentRawValue: nil,
+                currentNormalizedValue: nil,
+                targetValue: nil,
+                targetName: rule.sourceName,
+                error: error.localizedDescription
+            )
         }
+
         let targetName = sourceName(displayID: rule.displayID, value: rule.sourceValue, fallback: rule.sourceName)
         guard let targetValue = inputSourceVCPValue(sourceValue: rule.sourceValue, sourceName: targetName) else {
-            return false
+            return InputSourceSkipCheck(
+                shouldSkip: false,
+                reason: "target-map-failed",
+                currentRawOutput: currentResult.rawOutput,
+                currentRawValue: currentResult.rawValue,
+                currentNormalizedValue: currentResult.normalizedValue,
+                targetValue: nil,
+                targetName: targetName,
+                error: nil
+            )
         }
-        return currentValue == targetValue
+
+        return InputSourceSkipCheck(
+            shouldSkip: currentResult.normalizedValue == targetValue,
+            reason: currentResult.normalizedValue == targetValue ? "already-matched" : "needs-change",
+            currentRawOutput: currentResult.rawOutput,
+            currentRawValue: currentResult.rawValue,
+            currentNormalizedValue: currentResult.normalizedValue,
+            targetValue: targetValue,
+            targetName: targetName,
+            error: nil
+        )
     }
 
     private func inputSourceVCPValue(sourceValue: String, sourceName: String) -> Int? {

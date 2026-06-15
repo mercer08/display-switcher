@@ -6,6 +6,13 @@ APP_NAME="Display Switcher"
 BUNDLE_ID="dev.local.display-switcher"
 APP_DIR="$ROOT_DIR/build/$APP_NAME.app"
 EXECUTABLE="$ROOT_DIR/.build/release/DisplaySwitcher"
+VERSION="${APP_VERSION:-0.1.0}"
+BUILD_NUMBER="${BUILD_NUMBER:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
+GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && ! git diff-index --quiet HEAD --; then
+  GIT_COMMIT="$GIT_COMMIT-dirty"
+fi
+BUILD_TIME="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 cd "$ROOT_DIR"
 swift build -c release
@@ -36,9 +43,13 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>$VERSION</string>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>$BUILD_NUMBER</string>
+  <key>DSBuildTime</key>
+  <string>$BUILD_TIME</string>
+  <key>DSGitCommit</key>
+  <string>$GIT_COMMIT</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>NSHighResolutionCapable</key>
@@ -50,3 +61,6 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 PLIST
 
 echo "Built: $APP_DIR"
+echo "Version: $VERSION ($BUILD_NUMBER)"
+echo "Build time: $BUILD_TIME"
+echo "Git commit: $GIT_COMMIT"

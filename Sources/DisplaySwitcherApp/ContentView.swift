@@ -677,6 +677,14 @@ private struct StatusPanel: View {
                     .lineLimit(5)
                     .textSelection(.enabled)
             }
+
+            Divider()
+
+            Text(AppVersionInfo.current.displayText)
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .help(AppVersionInfo.current.detailText)
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 8).fill(AppColors.cardBackground))

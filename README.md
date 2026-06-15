@@ -112,6 +112,7 @@ Avoid blindly copying `configuration.json` between Macs unless you know the disp
 - Peer-to-peer Mac sync: let the app instances on two Macs communicate directly, so editing strategies or route metadata on either Mac can update the other side.
 - Cross-Mac control: support setting input sources for the other Mac from the current Mac, so either machine can switch the whole desk.
 - Mobile app: build an iPhone app for direct display input switching and strategy control.
+- Display mode memory: remember each display's resolution, refresh rate, HDR state, and scaling per strategy, then restore the preferred mode after input switching so monitors do not fall back to default resolution.
 - Logging: add an in-app log view for CLI calls, hotkey triggers, strategy confirmations, input-source switching results, setup checks, and errors.
 - New interface from design tooling: rebuild the interface from the design prototype while keeping feature logic and UI rendering separated.
 - Route editor: expose source device, source slot, cable type, and target slot as first-class editable fields instead of only inferring them from presets.

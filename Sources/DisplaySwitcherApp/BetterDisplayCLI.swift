@@ -17,6 +17,12 @@ enum BetterDisplayError: LocalizedError {
     }
 }
 
+struct CurrentInputSourceVCPValue {
+    var rawOutput: String
+    var rawValue: Int
+    var normalizedValue: Int
+}
+
 struct BetterDisplayCLI {
     var executablePath: String {
         if FileManager.default.isExecutableFile(atPath: "/opt/homebrew/bin/betterdisplaycli") {
@@ -58,7 +64,7 @@ struct BetterDisplayCLI {
         ])
     }
 
-    func currentInputSourceVCPValue(display: DisplayDevice) async throws -> Int {
+    func currentInputSourceVCPValue(display: DisplayDevice) async throws -> CurrentInputSourceVCPValue {
         let raw = try await run([
             "get",
             identifierArgument(for: display),
@@ -70,7 +76,11 @@ struct BetterDisplayCLI {
         guard let value = parseInteger(raw) else {
             throw BetterDisplayError.invalidOutput("Unable to read current input source from BetterDisplay CLI output: \(raw)")
         }
-        return normalizeVCPValue(value)
+        return CurrentInputSourceVCPValue(
+            rawOutput: raw,
+            rawValue: value,
+            normalizedValue: normalizeVCPValue(value)
+        )
     }
 
     private func identifierArgument(for display: DisplayDevice) -> String {
