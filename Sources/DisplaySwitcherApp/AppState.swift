@@ -79,7 +79,7 @@ final class AppState: ObservableObject {
                 syncRulesWithCurrentDisplays()
             }
 
-            statusMessage = fetchedDisplays.isEmpty ? t(.noBetterDisplayDisplays) : "\(t(.foundDisplays)) \(fetchedDisplays.count) display(s)"
+            statusMessage = fetchedDisplays.isEmpty ? t(.noBetterDisplayDisplays) : "\(t(.foundDisplays)) \(localizedDisplayCount(fetchedDisplays.count))"
         } catch {
             lastError = error.localizedDescription
             statusMessage = t(.refreshFailed)
@@ -126,14 +126,17 @@ final class AppState: ObservableObject {
     }
 
     func deleteSelectedGroup() {
-        guard let selectedGroupID, groups.count > 1 else { return }
+        guard let selectedGroupID,
+              groups.count > 1,
+              groups.first(where: { $0.id == selectedGroupID })?.isPreset == false else { return }
         groups.removeAll { $0.id == selectedGroupID }
         self.selectedGroupID = groups.first?.id
         saveConfiguration()
     }
 
     func updateGroup(_ group: SwitchGroup) {
-        guard let index = groups.firstIndex(where: { $0.id == group.id }) else { return }
+        guard let index = groups.firstIndex(where: { $0.id == group.id }),
+              groups[index].isPreset == false else { return }
         var updated = group
         updated.updatedAt = Date()
         groups[index] = updated
@@ -141,21 +144,22 @@ final class AppState: ObservableObject {
     }
 
     func groupDisplayName(_ group: SwitchGroup) -> String {
-        if group.nameEdited || group.presetKind == nil {
-            return group.name
+        if let presetKind = group.presetKind {
+            return localizedPresetName(presetKind) ?? group.name
         }
-        return localizedPresetName(group.presetKind) ?? group.name
+        return group.name
     }
 
     func groupDisplaySubtitle(_ group: SwitchGroup) -> String {
-        if group.subtitleEdited || group.presetKind == nil {
-            return group.subtitle
+        if let presetKind = group.presetKind {
+            return localizedPresetSubtitle(presetKind) ?? group.subtitle
         }
-        return localizedPresetSubtitle(group.presetKind) ?? group.subtitle
+        return group.subtitle
     }
 
     func updateGroupName(groupID: SwitchGroup.ID, name: String) {
-        guard let index = groups.firstIndex(where: { $0.id == groupID }) else { return }
+        guard let index = groups.firstIndex(where: { $0.id == groupID }),
+              groups[index].isPreset == false else { return }
         groups[index].name = name
         groups[index].nameEdited = true
         groups[index].updatedAt = Date()
@@ -163,7 +167,8 @@ final class AppState: ObservableObject {
     }
 
     func updateGroupSubtitle(groupID: SwitchGroup.ID, subtitle: String) {
-        guard let index = groups.firstIndex(where: { $0.id == groupID }) else { return }
+        guard let index = groups.firstIndex(where: { $0.id == groupID }),
+              groups[index].isPreset == false else { return }
         groups[index].subtitle = subtitle
         groups[index].subtitleEdited = true
         groups[index].updatedAt = Date()
@@ -172,6 +177,7 @@ final class AppState: ObservableObject {
 
     func updateRule(groupID: SwitchGroup.ID, rule: SwitchRule) {
         guard let groupIndex = groups.firstIndex(where: { $0.id == groupID }),
+              groups[groupIndex].isPreset == false,
               let ruleIndex = groups[groupIndex].rules.firstIndex(where: { $0.id == rule.id }) else { return }
         groups[groupIndex].rules[ruleIndex] = enrichRouteMetadata(rule, in: groups[groupIndex])
         groups[groupIndex].updatedAt = Date()
@@ -240,7 +246,7 @@ final class AppState: ObservableObject {
         }
 
         if failures.isEmpty {
-            statusMessage = "\(t(.appliedGroup)) \(displayName) to \(applied) display(s), \(t(.skippedDisplays)) \(skipped)"
+            statusMessage = "\(t(.appliedGroup)) \(displayName): \(t(.appliedDisplays)) \(applied), \(t(.skippedDisplays)) \(skipped)"
         } else {
             lastError = failures.joined(separator: "\n")
             statusMessage = "\(t(.appliedWithIssues)): \(failures.count)"
@@ -272,6 +278,15 @@ final class AppState: ObservableObject {
 
     func sourceName(displayID: String, value: String, fallback: String) -> String {
         inputSourcesByDisplayID[displayID]?.first(where: { $0.value == value })?.name ?? fallback
+    }
+
+    private func localizedDisplayCount(_ count: Int) -> String {
+        switch language {
+        case .english:
+            return "\(count) \(count == 1 ? "display" : "displays")"
+        case .chinese:
+            return "\(count) 台显示器"
+        }
     }
 
     private func shouldSkipInputSourceChange(display: DisplayDevice, rule: SwitchRule) async -> Bool {
@@ -448,7 +463,7 @@ final class AppState: ObservableObject {
             items.append(SetupCheckItem(
                 status: .success,
                 title: t(.setupCheckDisplays),
-                detail: "\(t(.foundDisplays)) \(checkedDisplays.count) display(s)"
+                detail: "\(t(.foundDisplays)) \(localizedDisplayCount(checkedDisplays.count))"
             ))
 
             var totalSources = 0
@@ -635,12 +650,10 @@ final class AppState: ObservableObject {
         groups.enumerated().map { _, group in
             guard let kind = group.presetKind else { return group }
             var normalized = group
-            if !normalized.nameEdited {
-                normalized.name = localizedPresetName(kind) ?? normalized.name
-            }
-            if !normalized.subtitleEdited {
-                normalized.subtitle = localizedPresetSubtitle(kind) ?? normalized.subtitle
-            }
+            normalized.name = localizedPresetName(kind) ?? normalized.name
+            normalized.subtitle = localizedPresetSubtitle(kind) ?? normalized.subtitle
+            normalized.nameEdited = false
+            normalized.subtitleEdited = false
             normalized.rules = group.rules.enumerated().map { index, rule in
                 guard let owner = routeOwner(for: kind, displayName: rule.displayName, displayIndex: index) else {
                     return enrichOfflineRouteMetadata(rule, owner: nil)

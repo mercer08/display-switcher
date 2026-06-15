@@ -180,6 +180,10 @@ struct SwitchGroup: Identifiable, Codable, Hashable {
     var nameEdited: Bool = false
     var subtitleEdited: Bool = false
 
+    var isPreset: Bool {
+        presetKind != nil
+    }
+
     init(
         id: UUID = UUID(),
         name: String,

@@ -100,7 +100,7 @@ private struct SidebarView: View {
                         .frame(width: 28)
                 }
                 .buttonStyle(.bordered)
-                .disabled(appState.groups.count <= 1)
+                .disabled(appState.groups.count <= 1 || appState.selectedGroup?.isPreset != false)
                 .help(appState.t(.deleteSelectedGroup))
             }
 
@@ -333,28 +333,53 @@ private struct StrategyEditor: View {
                             .frame(width: 42, height: 42)
                             .background(RoundedRectangle(cornerRadius: 8).fill(group.tintColor.opacity(0.14)))
 
-                        TextField(appState.t(.groupName), text: Binding(
-                            get: { appState.groupDisplayName(group) },
-                            set: { value in
-                                appState.updateGroupName(groupID: group.id, name: value)
-                            }
-                        ))
-                        .textFieldStyle(.roundedBorder)
+                        if group.isPreset {
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack(spacing: 8) {
+                                    Text(appState.groupDisplayName(group))
+                                        .font(.system(size: 17, weight: .bold))
+                                    Text(appState.t(.presetStrategy))
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.teal)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Capsule().fill(Color.teal.opacity(0.12)))
+                                }
 
-                        TextField(appState.t(.subtitle), text: Binding(
-                            get: { appState.groupDisplaySubtitle(group) },
-                            set: { value in
-                                appState.updateGroupSubtitle(groupID: group.id, subtitle: value)
+                                Text(appState.groupDisplaySubtitle(group))
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
                             }
-                        ))
-                        .textFieldStyle(.roundedBorder)
+                        } else {
+                            TextField(appState.t(.groupName), text: Binding(
+                                get: { appState.groupDisplayName(group) },
+                                set: { value in
+                                    appState.updateGroupName(groupID: group.id, name: value)
+                                }
+                            ))
+                            .textFieldStyle(.roundedBorder)
+
+                            TextField(appState.t(.subtitle), text: Binding(
+                                get: { appState.groupDisplaySubtitle(group) },
+                                set: { value in
+                                    appState.updateGroupSubtitle(groupID: group.id, subtitle: value)
+                                }
+                            ))
+                            .textFieldStyle(.roundedBorder)
+                        }
+
+                        Spacer(minLength: 0)
                     }
 
                     StrategyGraphView(group: group)
 
                     VStack(spacing: 8) {
                         ForEach(group.rules) { rule in
-                            RuleEditorRow(groupID: group.id, rule: rule)
+                            if group.isPreset {
+                                RuleSummaryRow(rule: rule)
+                            } else {
+                                RuleEditorRow(groupID: group.id, rule: rule)
+                            }
                         }
                     }
                 }
@@ -365,6 +390,60 @@ private struct StrategyEditor: View {
                 EmptyState(icon: "rectangle.stack.badge.plus", title: appState.t(.noGroupTitle), subtitle: appState.t(.noGroupSubtitle))
             }
         }
+    }
+}
+
+private struct RuleSummaryRow: View {
+    @EnvironmentObject private var appState: AppState
+    let rule: SwitchRule
+
+    private var display: DisplayDevice? {
+        appState.displays.first { $0.id == rule.displayID }
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: rule.enabled ? "checkmark.circle.fill" : "minus.circle")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(rule.enabled ? .teal : .secondary)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(display?.name ?? rule.displayName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                Text(display?.shortIdentity ?? appState.t(.disconnectedDisplay))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(width: 210, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(sourceText)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                Text(routeText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(AppColors.secondaryBackground))
+    }
+
+    private var sourceText: String {
+        let name = appState.sourceName(displayID: rule.displayID, value: rule.sourceValue, fallback: rule.sourceName)
+        return "\(appState.t(.source)) \(rule.sourceValue): \(name)"
+    }
+
+    private var routeText: String {
+        let source = rule.sourceDeviceName.isEmpty ? appState.t(.sourceDevices) : rule.sourceDeviceName
+        let cable = rule.cableType.isEmpty ? appState.t(.lineAndSlots) : rule.cableType
+        return "\(source) · \(cable)"
     }
 }
 

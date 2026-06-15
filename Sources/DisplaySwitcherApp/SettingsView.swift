@@ -31,33 +31,46 @@ struct SettingsView: View {
 
             Section(appState.t(.globalHotkeys)) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(appState.t(.globalHotkeysDescription))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "keyboard")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.teal)
+                            .frame(width: 32, height: 32)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(Color.teal.opacity(0.12)))
 
-                    VStack(spacing: 8) {
-                        ForEach(Array(appState.hotkeyRows().enumerated()), id: \.offset) { _, row in
-                            HStack(spacing: 12) {
-                                Text(row.shortcut)
-                                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                                    .padding(.horizontal, 9)
-                                    .padding(.vertical, 5)
-                                    .background(RoundedRectangle(cornerRadius: 7).fill(AppColors.secondaryBackground))
-
-                                Text(row.action)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .lineLimit(1)
-
-                                Spacer()
-                            }
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(appState.t(.globalHotkeys))
+                                .font(.headline)
+                            Text(appState.t(.globalHotkeysDescription))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
+
+                        Spacer()
                     }
 
-                    Text(appState.t(.hotkeyHyperTip))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    VStack(spacing: 6) {
+                        ForEach(Array(appState.hotkeyRows().enumerated()), id: \.offset) { _, row in
+                            HotkeyRow(shortcut: row.shortcut, action: row.action)
+                        }
+                    }
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(AppColors.cardBackground))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border, lineWidth: 1))
+
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "capslock")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.teal)
+                            .frame(width: 20)
+                        Text(appState.t(.hotkeyHyperTip))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(AppColors.secondaryBackground))
 
                     if !appState.hotkeyRegistrationIssues.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
@@ -142,6 +155,54 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .padding(22)
         .frame(width: 560)
+    }
+}
+
+private struct HotkeyRow: View {
+    let shortcut: String
+    let action: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(action)
+                .font(.system(size: 13, weight: .medium))
+                .lineLimit(1)
+
+            Spacer(minLength: 12)
+
+            KeycapCluster(shortcut: shortcut)
+        }
+        .frame(minHeight: 30)
+    }
+}
+
+private struct KeycapCluster: View {
+    let shortcut: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(Array(shortcut.map(String.init).enumerated()), id: \.offset) { _, key in
+                Keycap(text: key)
+            }
+        }
+        .accessibilityLabel(shortcut)
+    }
+}
+
+private struct Keycap: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .foregroundStyle(.primary)
+            .frame(minWidth: 24, minHeight: 24)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(AppColors.secondaryBackground)
+                    .shadow(color: .black.opacity(0.08), radius: 0, x: 0, y: 1)
+            )
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(AppColors.border, lineWidth: 1))
     }
 }
 

@@ -33,6 +33,7 @@ enum CopyKey: String {
     case inactiveRoute
     case groupName
     case subtitle
+    case presetStrategy
     case noGroupTitle
     case noGroupSubtitle
     case disconnectedDisplay
@@ -113,6 +114,7 @@ enum CopyKey: String {
     case presetPersonalLeftWorkRightSubtitle
     case applyingGroup
     case appliedGroup
+    case appliedDisplays
     case skippedDisplays
     case appliedWithIssues
     case switchingDisplay
@@ -163,6 +165,7 @@ enum Localization {
         .inactiveRoute: "Inactive route",
         .groupName: "Group name",
         .subtitle: "Subtitle",
+        .presetStrategy: "Preset",
         .noGroupTitle: "No group selected",
         .noGroupSubtitle: "Create a strategy group to start mapping displays.",
         .disconnectedDisplay: "Disconnected display",
@@ -179,7 +182,7 @@ enum Localization {
         .noVisibleSourcesTitle: "No input sources are visible",
         .noVisibleSourcesSubtitle: "Enable at least one input type above.",
         .language: "Language",
-        .english: "English",
+        .english: "英语",
         .chinese: "中文",
         .settings: "Settings",
         .appearance: "Appearance",
@@ -205,9 +208,9 @@ enum Localization {
         .usageStepSettings: "Settings: choose interface language and white or black theme.",
         .usageShortcut: "Global shortcuts: Control-Option-Command-1 through 4 open confirmation for the first four strategy groups.",
         .globalHotkeys: "Global Hotkeys",
-        .globalHotkeysDescription: "Use these shortcuts from anywhere. Strategy hotkeys open the confirmation modal first.",
+        .globalHotkeysDescription: "Available anywhere. Strategy shortcuts always ask for confirmation first.",
         .hotkeyConflict: "Some hotkeys could not be registered. They may already be used by macOS or another app.",
-        .hotkeyHyperTip: "Tip: map Caps Lock to Control-Option-Command-Shift with Karabiner-Elements, then use Caps Lock + 1-4 as a comfortable Hyper-key workflow.",
+        .hotkeyHyperTip: "Hyper tip: map Caps Lock to ⌃⌥⌘⇧, then press Caps Lock + 1-4.",
         .setupCheck: "Initialization Check",
         .runSetupCheck: "Run Check",
         .checkingSetup: "Checking...",
@@ -243,6 +246,7 @@ enum Localization {
         .presetPersonalLeftWorkRightSubtitle: "U3225QE to personal Mac, P2723QE to work Mac",
         .applyingGroup: "Applying",
         .appliedGroup: "Applied",
+        .appliedDisplays: "switched",
         .skippedDisplays: "skipped",
         .appliedWithIssues: "Applied with issues",
         .switchingDisplay: "Switching",
@@ -283,10 +287,11 @@ enum Localization {
         .inactiveRoute: "停用线路",
         .groupName: "策略组名称",
         .subtitle: "说明",
+        .presetStrategy: "内置预设",
         .noGroupTitle: "未选择策略组",
         .noGroupSubtitle: "创建一个策略组后即可配置显示器输入源。",
         .disconnectedDisplay: "显示器未连接",
-        .manualID: "手动 ID",
+        .manualID: "手动编号",
         .manual: "手动",
         .applyThisSource: "应用这个输入源",
         .quickSwitch: "快速切换",
@@ -315,7 +320,7 @@ enum Localization {
         .willSwitch: "将切换",
         .disconnected: "未连接",
         .usageGuide: "使用说明",
-        .appGuideTab: "App 使用说明",
+        .appGuideTab: "应用使用说明",
         .cliGuideTab: "BetterDisplay CLI",
         .usageOverview: "显示器切换器通过 BetterDisplay CLI 在多台 Mac 之间切换显示器输入源。",
         .usageStepRefresh: "刷新显示器：读取已连接显示器和可用输入源。",
@@ -325,9 +330,9 @@ enum Localization {
         .usageStepSettings: "设置：选择界面语言，以及白色或黑色主题。",
         .usageShortcut: "全局快捷键：Control-Option-Command-1 到 4 会打开前四个策略组的确认窗口。",
         .globalHotkeys: "全局快捷键",
-        .globalHotkeysDescription: "这些快捷键在其他 App 前台时也可以使用。策略快捷键会先打开确认弹窗。",
-        .hotkeyConflict: "部分快捷键注册失败，可能已经被 macOS 或其他 App 占用。",
-        .hotkeyHyperTip: "提示：可以用 Karabiner-Elements 把 Caps Lock 映射为 Control-Option-Command-Shift，再用 Caps Lock + 1-4 形成更顺手的 Hyper Key 工作流。",
+        .globalHotkeysDescription: "随时可用。策略快捷键会先弹出确认窗口。",
+        .hotkeyConflict: "部分快捷键注册失败，可能已经被 macOS 或其他应用占用。",
+        .hotkeyHyperTip: "Hyper Key：用 Karabiner-Elements 把 Caps Lock 映射为 ⌃⌥⌘⇧，再按 Caps Lock + 1-4。",
         .setupCheck: "初始化检查",
         .runSetupCheck: "开始检查",
         .checkingSetup: "检查中...",
@@ -337,7 +342,7 @@ enum Localization {
         .setupCheckCLIInstallGuide: "请先安装 BetterDisplay，并在 BetterDisplay 设置里启用集成功能，然后安装 CLI：brew install waydabber/betterdisplay/betterdisplaycli",
         .setupCheckDisplays: "已连接显示器",
         .setupCheckDisplaysMissing: "BetterDisplay CLI 没有返回任何显示器。",
-        .setupCheckBetterDisplayGuide: "请打开 BetterDisplay，确认集成功能已启用，显示器已经连接并能在 BetterDisplay 里看到，然后回到本 App 刷新显示器。",
+        .setupCheckBetterDisplayGuide: "请打开 BetterDisplay，确认集成功能已启用，显示器已经连接并能在 BetterDisplay 里看到，然后回到本应用刷新显示器。",
         .setupCheckInputSources: "输入源",
         .setupCheckInputSourcesReady: "已找到输入源",
         .setupCheckNoInputSources: "没有返回输入源",
@@ -363,6 +368,7 @@ enum Localization {
         .presetPersonalLeftWorkRightSubtitle: "U3225QE 给个人 Mac，P2723QE 给工作 Mac",
         .applyingGroup: "正在应用",
         .appliedGroup: "已应用",
+        .appliedDisplays: "已切换",
         .skippedDisplays: "已跳过",
         .appliedWithIssues: "应用完成但有问题",
         .switchingDisplay: "正在切换",

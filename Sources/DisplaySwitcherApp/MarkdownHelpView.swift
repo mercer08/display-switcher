@@ -243,21 +243,22 @@ enum HelpDocuments {
 brew install waydabber/betterdisplay/betterdisplaycli
 ```
 
-3. 打开本 App，进入 **Settings → 初始化检查**。
+3. 打开本应用，进入 **设置 → 初始化检查**。
 4. 检查通过后，回到主界面点击 **刷新**。
 5. 在策略组里确认每台显示器对应的输入源。
 
 ## 策略组
 
 - 左侧是策略组列表，默认前四个组适合两台 Mac + 两台显示器。
-- 选择策略组后，右侧可以编辑每台显示器要切到的输入源。
+- 前四个内置预设不可编辑，避免误删或误改。
+- 新建自定义策略组后，可以编辑每台显示器要切到的输入源。
 - 点击 **应用策略** 会先显示确认窗口，确认后才会切换。
 - `Command-Return` 会打开当前策略的确认窗口。
 
 ## 快速切换
 
 - 选择一台显示器后，可以在 **快速切换** 中只切换这一台。
-- 输入源筛选可以隐藏不常用的 `Legacy`、`Other` 等输入源。
+- 输入源筛选可以隐藏不常用的旧接口、其他等输入源。
 - 筛选只是隐藏显示，不会删除 BetterDisplay 返回的输入源。
 
 ## 全局快捷键
@@ -267,7 +268,7 @@ brew install waydabber/betterdisplay/betterdisplaycli
 - `Ctrl + Option + Command + 3`：第 3 个策略组
 - `Ctrl + Option + Command + 4`：第 4 个策略组
 - `Ctrl + Option + Command + R`：刷新显示器
-- `Ctrl + Option + Command + S`：打开 Settings
+- `Ctrl + Option + Command + S`：打开设置
 
 策略快捷键也会先打开确认窗口，不会静默切换。
 
@@ -279,8 +280,8 @@ brew install waydabber/betterdisplay/betterdisplaycli
 
 1. 复制 `Display Switcher.app` 到另一台 Mac。
 2. 在那台 Mac 安装 BetterDisplay 和 `betterdisplaycli`。
-3. 打开 Settings 跑初始化检查。
-4. 刷新显示器并重新编辑策略组。
+3. 打开设置并运行初始化检查。
+4. 刷新显示器，确认内置预设，必要时新建自定义策略组。
 
 不要盲目复制 `configuration.json`，因为 BetterDisplay 的显示器 UUID / tagID 可能在不同 Mac 上不同。
 """
@@ -304,7 +305,8 @@ brew install waydabber/betterdisplay/betterdisplaycli
 ## Strategy groups
 
 - The sidebar lists your strategy groups. The first four defaults are designed for two Macs and two displays.
-- Select a group, then edit which input source each display should use.
+- The first four presets are read-only to prevent accidental edits or deletion.
+- Create a custom group when you want to edit which input source each display should use.
 - **Apply Group** opens a confirmation window before switching.
 - `Command-Return` opens confirmation for the selected strategy.
 
@@ -334,7 +336,7 @@ With Karabiner-Elements, map `Caps Lock` to `Ctrl + Option + Command + Shift` fo
 1. Copy `Display Switcher.app` to the other Mac.
 2. Install BetterDisplay and `betterdisplaycli` on that Mac.
 3. Run Initialization Check in Settings.
-4. Refresh displays and edit the strategy groups.
+4. Refresh displays, review the presets, and create custom groups if needed.
 
 Avoid blindly copying `configuration.json` because BetterDisplay display UUIDs and tag IDs can differ per Mac.
 """
@@ -359,7 +361,7 @@ which betterdisplaycli
 betterdisplaycli help
 ```
 
-如果找不到 CLI，本 App 的 Settings → 初始化检查会显示安装指引。
+如果找不到 CLI，本应用的设置 → 初始化检查会显示安装指引。
 
 ## 列出显示器
 
@@ -388,7 +390,7 @@ betterdisplaycli get --name="DELL U3225QE" --inputSourceList
 6 - USB-C / TB 1 [DDCController]
 ```
 
-本 App 会把这些输入源解析成 Quick Switch 按钮和策略组下拉选项。
+本应用会把这些输入源解析成快速切换按钮和自定义策略组下拉选项。
 
 ## 切换输入源
 
@@ -402,7 +404,7 @@ betterdisplaycli perform --name="DELL U3225QE" --changeInputSource=6
 betterdisplaycli perform --tagID=26 --changeInputSource=6
 ```
 
-本 App 优先使用 `tagID`，其次使用 `UUID`，最后才使用 `name`。
+本应用优先使用 `tagID`，其次使用 `UUID`，最后才使用 `name`。
 
 ## 常见问题
 
@@ -410,7 +412,7 @@ betterdisplaycli perform --tagID=26 --changeInputSource=6
 
 - 打开 BetterDisplay，确认显示器在 BetterDisplay 里可见。
 - 确认 Integration / CLI 已启用。
-- 重新运行本 App 的初始化检查。
+- 重新运行本应用的初始化检查。
 
 ### 显示器有了，但没有输入源
 
