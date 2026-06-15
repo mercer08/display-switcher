@@ -312,7 +312,7 @@ struct ApplyConfirmationView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.teal)
-                .keyboardShortcut(.defaultAction)
+                .keyboardShortcut(.return, modifiers: [.command])
                 .disabled(enabledRules.isEmpty || appState.isApplying)
             }
         }
