@@ -8,6 +8,8 @@ private struct InputSourceSkipCheck {
     var currentRawOutput: String?
     var currentRawValue: Int?
     var currentNormalizedValue: Int?
+    var currentLowByteValue: Int?
+    var currentHighByteValue: Int?
     var targetValue: Int?
     var targetName: String
     var error: String?
@@ -21,6 +23,8 @@ private struct InputSourceSkipCheck {
             "targetVCP=\(targetValue.map(String.init) ?? "nil")",
             "currentRawOutput=\(currentRawOutput ?? "nil")",
             "currentRawValue=\(currentRawValue.map(String.init) ?? "nil")",
+            "currentLowByte=\(currentLowByteValue.map(String.init) ?? "nil")",
+            "currentHighByte=\(currentHighByteValue.map(String.init) ?? "nil")",
             "currentVCP=\(currentNormalizedValue.map(String.init) ?? "nil")",
             "skip=\(shouldSkip)",
             "reason=\(reason)",
@@ -337,6 +341,18 @@ final class AppState: ObservableObject {
         statusMessage = "\(t(.switchingDisplay)) \(display.name) -> \(source.name)..."
         defer { isApplying = false }
         do {
+            let rule = SwitchRule(
+                displayID: display.id,
+                displayName: display.name,
+                sourceValue: source.value,
+                sourceName: source.name
+            )
+            let check = await inputSourceSkipCheck(display: display, rule: rule)
+            logger.info(check.logMessage(display: display, rule: rule))
+            if check.shouldSkip {
+                statusMessage = "\(t(.switchedDisplay)) \(display.name) -> \(source.name) (\(t(.skippedDisplays)))"
+                return
+            }
             _ = try await cli.changeInputSource(display: display, sourceValue: source.value)
             statusMessage = "\(t(.switchedDisplay)) \(display.name) -> \(source.name)"
         } catch {
@@ -377,6 +393,8 @@ final class AppState: ObservableObject {
                 currentRawOutput: nil,
                 currentRawValue: nil,
                 currentNormalizedValue: nil,
+                currentLowByteValue: nil,
+                currentHighByteValue: nil,
                 targetValue: nil,
                 targetName: rule.sourceName,
                 error: error.localizedDescription
@@ -391,6 +409,8 @@ final class AppState: ObservableObject {
                 currentRawOutput: currentResult.rawOutput,
                 currentRawValue: currentResult.rawValue,
                 currentNormalizedValue: currentResult.normalizedValue,
+                currentLowByteValue: currentResult.lowByteValue,
+                currentHighByteValue: currentResult.highByteValue,
                 targetValue: nil,
                 targetName: targetName,
                 error: nil
@@ -403,6 +423,8 @@ final class AppState: ObservableObject {
             currentRawOutput: currentResult.rawOutput,
             currentRawValue: currentResult.rawValue,
             currentNormalizedValue: currentResult.normalizedValue,
+            currentLowByteValue: currentResult.lowByteValue,
+            currentHighByteValue: currentResult.highByteValue,
             targetValue: targetValue,
             targetName: targetName,
             error: nil

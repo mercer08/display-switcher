@@ -21,6 +21,8 @@ struct CurrentInputSourceVCPValue {
     var rawOutput: String
     var rawValue: Int
     var normalizedValue: Int
+    var lowByteValue: Int?
+    var highByteValue: Int?
 }
 
 struct BetterDisplayCLI {
@@ -87,7 +89,9 @@ struct BetterDisplayCLI {
         return CurrentInputSourceVCPValue(
             rawOutput: raw,
             rawValue: value,
-            normalizedValue: normalizeVCPValue(value)
+            normalizedValue: normalizeVCPValue(value),
+            lowByteValue: lowByteValue(value),
+            highByteValue: highByteValue(value)
         )
     }
 
@@ -236,9 +240,25 @@ struct BetterDisplayCLI {
     }
 
     private func normalizeVCPValue(_ value: Int) -> Int {
+        guard value > 0xff else { return value }
         let lowByte = value & 0xff
+        if lowByte != 0 {
+            return lowByte
+        }
         let highByte = (value >> 8) & 0xff
-        return lowByte == highByte && lowByte != 0 ? lowByte : value
+        return highByte != 0 ? highByte : value
+    }
+
+    private func lowByteValue(_ value: Int) -> Int? {
+        guard value > 0xff else { return nil }
+        let lowByte = value & 0xff
+        return lowByte == 0 ? nil : lowByte
+    }
+
+    private func highByteValue(_ value: Int) -> Int? {
+        guard value > 0xff else { return nil }
+        let highByte = (value >> 8) & 0xff
+        return highByte == 0 ? nil : highByte
     }
 
     private func which(_ executable: String) -> String? {
