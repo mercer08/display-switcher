@@ -5,7 +5,11 @@ struct StrategyGraphView: View {
     let group: SwitchGroup
 
     private var routes: [GraphRoute] {
-        group.rules.map { rule in
+        let disconnectTargetIDs = Set(appState.connectionActionsPreview(for: group)
+            .filter { $0.operation == .disconnect }
+            .map { $0.display.id })
+
+        return group.rules.map { rule in
             let targetSlot = rule.targetSlot.isEmpty ? appState.sourceName(displayID: rule.displayID, value: rule.sourceValue, fallback: rule.sourceName) : rule.targetSlot
             let cableType = rule.cableType.isEmpty ? cableTypeFallback(for: targetSlot) : rule.cableType
             let sourceSlot = rule.sourceSlot.isEmpty ? "USB-C" : rule.sourceSlot
@@ -22,7 +26,8 @@ struct StrategyGraphView: View {
                 targetID: rule.displayID,
                 targetName: displayName(for: rule),
                 targetDetail: displayDetail(for: rule),
-                isEnabled: rule.enabled && !rule.sourceValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                isEnabled: rule.enabled && !rule.sourceValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                isDisconnectTarget: disconnectTargetIDs.contains(rule.displayID)
             )
         }
     }
@@ -64,7 +69,9 @@ struct StrategyGraphView: View {
             GraphTargetNode(
                 id: $0.targetID,
                 name: $0.targetName,
-                detail: $0.targetDetail
+                detail: $0.targetDetail,
+                badge: $0.isDisconnectTarget ? appState.t(.disconnectDisplay) : nil,
+                tint: $0.isDisconnectTarget ? .orange : .blue
             )
         }
     }
@@ -133,8 +140,8 @@ struct StrategyGraphView: View {
                             title: node.name,
                             subtitle: node.detail,
                             systemImage: "display",
-                            tint: .blue,
-                            badge: nil
+                            tint: node.tint,
+                            badge: node.badge
                         )
                         .frame(width: layout.targetWidth)
                         .position(layout.targetCardPosition(for: node.id))
@@ -303,6 +310,7 @@ private struct GraphRoute: Identifiable {
     var targetName: String
     var targetDetail: String
     var isEnabled: Bool
+    var isDisconnectTarget: Bool
 }
 
 private struct GraphSourceNode: Identifiable {
@@ -334,6 +342,8 @@ private struct GraphTargetNode: Identifiable {
     var id: String
     var name: String
     var detail: String
+    var badge: String?
+    var tint: Color
 }
 
 private struct GraphLayout {

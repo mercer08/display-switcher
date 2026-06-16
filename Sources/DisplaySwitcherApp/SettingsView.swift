@@ -29,6 +29,76 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
             }
 
+            Section(appState.t(.displayConnectionManagement)) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "desktopcomputer.and.macbook")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.teal)
+                            .frame(width: 32, height: 32)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(Color.teal.opacity(0.12)))
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(appState.t(.localMacRole))
+                                .font(.headline)
+                            Text(appState.t(.localMacRoleDescription))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    Picker(appState.t(.localMacRole), selection: Binding(
+                        get: { appState.localMacRole },
+                        set: { appState.setLocalMacRole($0) }
+                    )) {
+                        ForEach(LocalMacRole.allCases) { role in
+                            Text(role.label(language: appState.language)).tag(role)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(appState.t(.managedDisconnectedDisplays))
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+
+                        if appState.managedDisconnectedDisplays.isEmpty {
+                            Text(appState.t(.noManagedDisconnectedDisplays))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(RoundedRectangle(cornerRadius: 8).fill(AppColors.cardBackground))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border, lineWidth: 1))
+                        } else {
+                            ForEach(appState.managedDisconnectedDisplays) { display in
+                                HStack(spacing: 10) {
+                                    Image(systemName: "display.trianglebadge.exclamationmark")
+                                        .foregroundStyle(.orange)
+                                        .frame(width: 20)
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(display.name)
+                                            .font(.system(size: 13, weight: .semibold))
+                                        Text(display.shortIdentity)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    Spacer()
+                                }
+                                .padding(10)
+                                .background(RoundedRectangle(cornerRadius: 8).fill(AppColors.cardBackground))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppColors.border, lineWidth: 1))
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+
             Section(appState.t(.globalHotkeys)) {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .top, spacing: 12) {
@@ -264,6 +334,10 @@ struct ApplyConfirmationView: View {
         group.rules.filter { !$0.enabled || $0.sourceValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
+    private var connectionActions: [DisplayConnectionAction] {
+        appState.connectionActionsPreview(for: group)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
@@ -293,6 +367,9 @@ struct ApplyConfirmationView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     ConfirmationSection(title: appState.t(.enabledRules), rules: enabledRules, isEnabledSection: true)
+                    if !connectionActions.isEmpty {
+                        ConnectionActionSection(actions: connectionActions)
+                    }
                     if !disabledRules.isEmpty {
                         ConfirmationSection(title: appState.t(.disabledRules), rules: disabledRules, isEnabledSection: false)
                     }
@@ -317,6 +394,63 @@ struct ApplyConfirmationView: View {
             }
         }
         .padding(22)
+    }
+}
+
+private struct ConnectionActionSection: View {
+    @EnvironmentObject private var appState: AppState
+    let actions: [DisplayConnectionAction]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(appState.t(.displayConnectionManagement))
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+
+            ForEach(actions) { action in
+                HStack(spacing: 10) {
+                    Image(systemName: symbolName(for: action.operation))
+                        .foregroundStyle(color(for: action.operation))
+                        .frame(width: 20)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(action.display.name)
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(detailText(for: action))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 8).fill(AppColors.secondaryBackground))
+            }
+        }
+    }
+
+    private func detailText(for action: DisplayConnectionAction) -> String {
+        let actionName = action.operation == .reconnect ? appState.t(.reconnectDisplay) : appState.t(.disconnectDisplay)
+        return "\(actionName): \(action.reason)"
+    }
+
+    private func symbolName(for operation: DisplayConnectionOperation) -> String {
+        switch operation {
+        case .reconnect:
+            return "display.badge.checkmark"
+        case .disconnect:
+            return "display.trianglebadge.exclamationmark"
+        }
+    }
+
+    private func color(for operation: DisplayConnectionOperation) -> Color {
+        switch operation {
+        case .reconnect:
+            return .teal
+        case .disconnect:
+            return .orange
+        }
     }
 }
 

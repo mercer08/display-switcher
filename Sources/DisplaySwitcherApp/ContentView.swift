@@ -240,7 +240,7 @@ private struct DisplayOverview: View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: appState.t(.displays), systemImage: "display")
 
-            if appState.displays.isEmpty {
+            if appState.displays.isEmpty && appState.managedDisconnectedDisplays.isEmpty {
                 EmptyState(
                     icon: "display.trianglebadge.exclamationmark",
                     title: appState.t(.noDisplaysTitle),
@@ -250,6 +250,11 @@ private struct DisplayOverview: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 270), spacing: 12)], spacing: 12) {
                     ForEach(appState.displays) { display in
                         DisplayCard(display: display)
+                    }
+                    ForEach(appState.managedDisconnectedDisplays.filter { disconnected in
+                        !appState.displays.contains { $0.id == disconnected.id }
+                    }) { display in
+                        ManagedDisconnectedDisplayCard(display: display)
                     }
                 }
             }
@@ -308,6 +313,62 @@ private struct DisplayCard: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private func compactPair(_ first: String?, _ second: String?) -> String {
+        [first, second].compactMap { item in
+            guard let item, !item.isEmpty else { return nil }
+            return item
+        }.joined(separator: " / ").nonEmpty ?? appState.t(.unknown)
+    }
+}
+
+private struct ManagedDisconnectedDisplayCard: View {
+    @EnvironmentObject private var appState: AppState
+    let display: DisplayDevice
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                Image(systemName: "display.trianglebadge.exclamationmark")
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundStyle(.orange)
+                    .frame(width: 42, height: 42)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.orange.opacity(0.12)))
+
+                Spacer()
+
+                Text(appState.t(.disconnectDisplay))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(Color.orange.opacity(0.12)))
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(display.name)
+                    .font(.system(size: 17, weight: .bold))
+                    .lineLimit(1)
+                Text(display.shortIdentity)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                InfoLine(title: appState.t(.product), value: display.productName ?? display.originalName ?? display.name)
+                InfoLine(title: appState.t(.vendorModel), value: compactPair(display.vendor, display.model))
+                InfoLine(title: appState.t(.made), value: display.manufactureSummary)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8).fill(AppColors.cardBackground))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.orange.opacity(0.55), lineWidth: 1)
+        }
     }
 
     private func compactPair(_ first: String?, _ second: String?) -> String {

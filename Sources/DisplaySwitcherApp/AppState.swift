@@ -43,6 +43,8 @@ final class AppState: ObservableObject {
     @Published var language: AppLanguage = .english
     @Published var theme: AppTheme = .light
     @Published var visibleSourceCategories: Set<SourceCategory> = SourceCategory.defaultVisible
+    @Published var localMacRole: LocalMacRole = .work
+    @Published var managedDisconnectedDisplays: [DisplayDevice] = []
     @Published var pendingApplyGroup: SwitchGroup?
     @Published var isShowingUsageGuide = false
     @Published var isRunningSetupCheck = false
@@ -59,6 +61,7 @@ final class AppState: ObservableObject {
             .appendingPathComponent("DisplaySwitcher", isDirectory: true)
         try? FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
         configurationURL = support.appendingPathComponent("configuration.json")
+        localMacRole = Self.detectedLocalMacRole()
         loadConfiguration()
     }
 
@@ -257,9 +260,26 @@ final class AppState: ObservableObject {
         logger.info("Apply group started: \(displayName)")
         defer { isApplying = false }
 
+        var reconnected = 0
+        var disconnected = 0
         var applied = 0
         var skipped = 0
         var failures: [String] = []
+
+        let reconnectActions = managedDisconnectedDisplays.map {
+            DisplayConnectionAction(display: $0, operation: .reconnect, reason: t(.managedReconnectReason))
+        }
+
+        if !reconnectActions.isEmpty {
+            statusMessage = "\(t(.reconnectingDisplays)) \(reconnectActions.count)..."
+            let resetResult = await applyConnectionActions(reconnectActions)
+            reconnected = resetResult.succeeded
+            failures.append(contentsOf: resetResult.failures)
+            if reconnected > 0 {
+                await reloadDisplaysAfterConnectionChange()
+            }
+        }
+
         for rule in group.rules where rule.enabled && !rule.sourceValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             guard let display = displays.first(where: { $0.id == rule.displayID }) else { continue }
             do {
@@ -278,8 +298,24 @@ final class AppState: ObservableObject {
             }
         }
 
+        let shouldDisconnect = failures.isEmpty
+        if shouldDisconnect {
+            let disconnectActions = disconnectActions(for: group)
+            if !disconnectActions.isEmpty {
+                statusMessage = "\(t(.disconnectingDisplays)) \(disconnectActions.count)..."
+                let disconnectResult = await applyConnectionActions(disconnectActions)
+                disconnected = disconnectResult.succeeded
+                failures.append(contentsOf: disconnectResult.failures)
+                if disconnected > 0 {
+                    await reloadDisplaysAfterConnectionChange()
+                }
+            }
+        } else {
+            logger.warning("Skipping display disconnect because input switching or reconnect reported failures.")
+        }
+
         if failures.isEmpty {
-            statusMessage = "\(t(.appliedGroup)) \(displayName): \(t(.appliedDisplays)) \(applied), \(t(.skippedDisplays)) \(skipped)"
+            statusMessage = "\(t(.appliedGroup)) \(displayName): \(t(.appliedDisplays)) \(applied), \(t(.skippedDisplays)) \(skipped), \(t(.reconnectedDisplays)) \(reconnected), \(t(.disconnectedDisplays)) \(disconnected)"
         } else {
             lastError = failures.joined(separator: "\n")
             statusMessage = "\(t(.appliedWithIssues)): \(failures.count)"
@@ -465,6 +501,18 @@ final class AppState: ObservableObject {
         saveConfiguration()
     }
 
+    func setLocalMacRole(_ role: LocalMacRole) {
+        localMacRole = role
+        saveConfiguration()
+    }
+
+    func connectionActionsPreview(for group: SwitchGroup) -> [DisplayConnectionAction] {
+        let reconnectActions = managedDisconnectedDisplays.map {
+            DisplayConnectionAction(display: $0, operation: .reconnect, reason: t(.managedReconnectReason))
+        }
+        return reconnectActions + disconnectActions(for: group)
+    }
+
     func hotkeyRows() -> [(shortcut: String, action: String)] {
         GlobalHotkeyAction.allCases.map { action in
             switch action {
@@ -582,6 +630,78 @@ final class AppState: ObservableObject {
         }
     }
 
+    private func disconnectActions(for group: SwitchGroup) -> [DisplayConnectionAction] {
+        guard group.presetKind?.isSplitPreset == true else { return [] }
+        guard let kind = group.presetKind else { return [] }
+        let localOwner = localMacRole.macOwner
+        let targets = displays.filter { display in
+            routeOwner(for: kind, display: display, displayIndex: displayIndex(for: display)) != localOwner
+        }
+
+        guard !targets.isEmpty else { return [] }
+
+        let remainingDisplayCount = displays.count - targets.count
+        if remainingDisplayCount < 1 {
+            logger.warning("Skipping display disconnect because it would leave no external displays connected for this Mac.")
+            return []
+        }
+
+        return targets.map { display in
+            DisplayConnectionAction(
+                display: display,
+                operation: .disconnect,
+                reason: "\(t(.notAssignedToThisMacReason)) \(localMacRole.label(language: language))"
+            )
+        }
+    }
+
+    private func applyConnectionActions(_ actions: [DisplayConnectionAction]) async -> (succeeded: Int, failures: [String]) {
+        var succeeded = 0
+        var failures: [String] = []
+
+        for action in actions {
+            do {
+                _ = try await cli.setDisplayConnection(display: action.display, connected: action.operation == .reconnect)
+                updateManagedDisconnectedDisplays(for: action)
+                logger.info("Display connection \(action.operation.rawValue): display=\(action.display.name), reason=\(action.reason)")
+                succeeded += 1
+            } catch {
+                let actionName = action.operation == .reconnect ? t(.reconnectDisplay) : t(.disconnectDisplay)
+                logger.warning("Display connection failed: action=\(action.operation.rawValue), display=\(action.display.name), error=\(error.localizedDescription)")
+                failures.append("\(actionName) \(action.display.name): \(error.localizedDescription)")
+            }
+        }
+
+        if succeeded > 0 {
+            saveConfiguration()
+        }
+
+        return (succeeded, failures)
+    }
+
+    private func updateManagedDisconnectedDisplays(for action: DisplayConnectionAction) {
+        switch action.operation {
+        case .reconnect:
+            managedDisconnectedDisplays.removeAll { $0.stableID == action.display.stableID }
+        case .disconnect:
+            guard !managedDisconnectedDisplays.contains(where: { $0.stableID == action.display.stableID }) else { return }
+            managedDisconnectedDisplays.append(action.display)
+        }
+    }
+
+    private func reloadDisplaysAfterConnectionChange() async {
+        try? await Task.sleep(nanoseconds: 1_200_000_000)
+        do {
+            let fetchedDisplays = try await cli.listDisplays()
+            displays = fetchedDisplays
+            selectedDisplayID = fetchedDisplays.first { $0.id == selectedDisplayID }?.id ?? fetchedDisplays.first?.id
+            try await refreshInputSources(for: fetchedDisplays)
+            syncRulesWithCurrentDisplays()
+        } catch {
+            logger.warning("Display reload after connection change failed: \(error.localizedDescription)")
+        }
+    }
+
     private func loadConfiguration() {
         guard let data = try? Data(contentsOf: configurationURL),
               let configuration = try? JSONDecoder().decode(PersistedConfiguration.self, from: data) else {
@@ -590,10 +710,20 @@ final class AppState: ObservableObject {
         language = configuration.language
         theme = configuration.theme
         visibleSourceCategories = configuration.visibleSourceCategories
+        localMacRole = configuration.localMacRole
+        managedDisconnectedDisplays = configuration.managedDisconnectedDisplays
         groups = normalizePresetGroups(migratePresetGroups(configuration.groups))
         statusMessage = t(.ready)
         selectedGroupID = groups.first?.id
         saveConfiguration()
+    }
+
+    private static func detectedLocalMacRole() -> LocalMacRole {
+        let hostName = (Host.current().localizedName ?? Host.current().name ?? "").lowercased()
+        if hostName.contains("mini") || hostName.contains("personal") || hostName.contains("个人") {
+            return .personal
+        }
+        return .work
     }
 
     private func saveConfiguration() {
@@ -601,7 +731,9 @@ final class AppState: ObservableObject {
             groups: groups,
             language: language,
             theme: theme,
-            visibleSourceCategories: visibleSourceCategories
+            visibleSourceCategories: visibleSourceCategories,
+            localMacRole: localMacRole,
+            managedDisconnectedDisplays: managedDisconnectedDisplays
         )
         guard let data = try? JSONEncoder.pretty.encode(configuration) else { return }
         try? data.write(to: configurationURL, options: .atomic)
@@ -960,7 +1092,29 @@ private extension JSONEncoder {
     }
 }
 
-private enum MacOwner {
+private extension GroupPresetKind {
+    var isSplitPreset: Bool {
+        switch self {
+        case .workLeftPersonalRight, .personalLeftWorkRight:
+            return true
+        case .workBoth, .personalBoth:
+            return false
+        }
+    }
+}
+
+private extension LocalMacRole {
+    var macOwner: MacOwner {
+        switch self {
+        case .work:
+            return .work
+        case .personal:
+            return .personal
+        }
+    }
+}
+
+private enum MacOwner: Equatable {
     case work
     case personal
 

@@ -32,6 +32,25 @@ enum GroupPresetKind: String, Codable, Hashable {
     case personalLeftWorkRight
 }
 
+enum LocalMacRole: String, CaseIterable, Codable, Identifiable {
+    case work
+    case personal
+
+    var id: String { rawValue }
+}
+
+enum DisplayConnectionOperation: String, Codable, Hashable {
+    case reconnect
+    case disconnect
+}
+
+struct DisplayConnectionAction: Identifiable, Codable, Hashable {
+    var id: String { "\(display.stableID)-\(operation.rawValue)" }
+    var display: DisplayDevice
+    var operation: DisplayConnectionOperation
+    var reason: String
+}
+
 enum SetupCheckStatus {
     case success
     case warning
@@ -228,17 +247,23 @@ struct PersistedConfiguration: Codable {
     var language: AppLanguage
     var theme: AppTheme
     var visibleSourceCategories: Set<SourceCategory>
+    var localMacRole: LocalMacRole
+    var managedDisconnectedDisplays: [DisplayDevice]
 
     init(
         groups: [SwitchGroup],
         language: AppLanguage = .english,
         theme: AppTheme = .light,
-        visibleSourceCategories: Set<SourceCategory> = SourceCategory.defaultVisible
+        visibleSourceCategories: Set<SourceCategory> = SourceCategory.defaultVisible,
+        localMacRole: LocalMacRole = .work,
+        managedDisconnectedDisplays: [DisplayDevice] = []
     ) {
         self.groups = groups
         self.language = language
         self.theme = theme
         self.visibleSourceCategories = visibleSourceCategories
+        self.localMacRole = localMacRole
+        self.managedDisconnectedDisplays = managedDisconnectedDisplays
     }
 
     init(from decoder: Decoder) throws {
@@ -247,6 +272,8 @@ struct PersistedConfiguration: Codable {
         language = try container.decodeIfPresent(AppLanguage.self, forKey: .language) ?? .english
         theme = try container.decodeIfPresent(AppTheme.self, forKey: .theme) ?? .light
         visibleSourceCategories = try container.decodeIfPresent(Set<SourceCategory>.self, forKey: .visibleSourceCategories) ?? SourceCategory.defaultVisible
+        localMacRole = try container.decodeIfPresent(LocalMacRole.self, forKey: .localMacRole) ?? .work
+        managedDisconnectedDisplays = try container.decodeIfPresent([DisplayDevice].self, forKey: .managedDisconnectedDisplays) ?? []
     }
 }
 

@@ -57,6 +57,21 @@ enum CopyKey: String {
     case theme
     case lightTheme
     case darkTheme
+    case localMacRole
+    case localMacRoleDescription
+    case workMacRole
+    case personalMacRole
+    case displayConnectionManagement
+    case managedDisconnectedDisplays
+    case reconnectDisplay
+    case disconnectDisplay
+    case reconnectingDisplays
+    case disconnectingDisplays
+    case reconnectedDisplays
+    case disconnectedDisplays
+    case managedReconnectReason
+    case notAssignedToThisMacReason
+    case noManagedDisconnectedDisplays
     case applyConfirmationTitle
     case applyConfirmationSubtitle
     case confirmApply
@@ -189,6 +204,21 @@ enum Localization {
         .theme: "Theme",
         .lightTheme: "White",
         .darkTheme: "Black",
+        .localMacRole: "This Mac",
+        .localMacRoleDescription: "Used by split presets to decide which physical display this Mac keeps connected.",
+        .workMacRole: "Work MacBook Pro",
+        .personalMacRole: "Personal Mac mini",
+        .displayConnectionManagement: "Display Connection Management",
+        .managedDisconnectedDisplays: "Managed disconnected displays",
+        .reconnectDisplay: "Reconnect",
+        .disconnectDisplay: "Disconnect",
+        .reconnectingDisplays: "Reconnecting displays",
+        .disconnectingDisplays: "Disconnecting displays",
+        .reconnectedDisplays: "reconnected",
+        .disconnectedDisplays: "disconnected",
+        .managedReconnectReason: "Restore display previously disconnected by this app",
+        .notAssignedToThisMacReason: "Not assigned to",
+        .noManagedDisconnectedDisplays: "No displays are currently managed as disconnected by this app.",
         .applyConfirmationTitle: "Review Strategy",
         .applyConfirmationSubtitle: "Confirm the display input changes before BetterDisplay switches sources.",
         .confirmApply: "Confirm and Switch",
@@ -311,6 +341,21 @@ enum Localization {
         .theme: "主题",
         .lightTheme: "白色",
         .darkTheme: "黑色",
+        .localMacRole: "这台 Mac",
+        .localMacRoleDescription: "分屏预设会根据这个身份判断本机应该保留哪台真实显示器。",
+        .workMacRole: "工作 MacBook Pro",
+        .personalMacRole: "个人 Mac mini",
+        .displayConnectionManagement: "显示器连接管理",
+        .managedDisconnectedDisplays: "由本应用托管断开的显示器",
+        .reconnectDisplay: "恢复连接",
+        .disconnectDisplay: "断开",
+        .reconnectingDisplays: "正在恢复显示器",
+        .disconnectingDisplays: "正在断开显示器",
+        .reconnectedDisplays: "已恢复",
+        .disconnectedDisplays: "已断开",
+        .managedReconnectReason: "恢复之前由本应用断开的显示器",
+        .notAssignedToThisMacReason: "不分配给",
+        .noManagedDisconnectedDisplays: "当前没有由本应用托管断开的显示器。",
         .applyConfirmationTitle: "确认策略",
         .applyConfirmationSubtitle: "BetterDisplay 切换输入源前，请先确认下面的显示器变更。",
         .confirmApply: "确认并切换",
@@ -395,6 +440,17 @@ extension AppTheme {
             Localization.text(.lightTheme, language: language)
         case .dark:
             Localization.text(.darkTheme, language: language)
+        }
+    }
+}
+
+extension LocalMacRole {
+    func label(language: AppLanguage) -> String {
+        switch self {
+        case .work:
+            Localization.text(.workMacRole, language: language)
+        case .personal:
+            Localization.text(.personalMacRole, language: language)
         }
     }
 }

@@ -64,6 +64,14 @@ struct BetterDisplayCLI {
         ])
     }
 
+    func setDisplayConnection(display: DisplayDevice, connected: Bool) async throws -> String {
+        try await run([
+            "set",
+            identifierArgument(for: display),
+            "--connected=\(connected ? "on" : "off")"
+        ])
+    }
+
     func currentInputSourceVCPValue(display: DisplayDevice) async throws -> CurrentInputSourceVCPValue {
         let raw = try await run([
             "get",
