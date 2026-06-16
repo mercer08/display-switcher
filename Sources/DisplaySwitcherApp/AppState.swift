@@ -278,9 +278,7 @@ final class AppState: ObservableObject {
         var skipped = 0
         var failures: [String] = []
 
-        let reconnectActions = managedDisconnectedDisplays.map {
-            DisplayConnectionAction(display: $0, operation: .reconnect, reason: t(.managedReconnectReason))
-        }
+        let reconnectActions = await reconnectActions(for: group)
 
         if !reconnectActions.isEmpty {
             statusMessage = "\(t(.reconnectingDisplays)) \(reconnectActions.count)..."
@@ -292,27 +290,31 @@ final class AppState: ObservableObject {
             }
         }
 
-        for rule in group.rules where rule.enabled && !rule.sourceValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            guard let display = displays.first(where: { $0.id == rule.displayID }) else { continue }
-            do {
-                if await shouldSkipPresetInputSwitchForConnectedLocalDisplay(display: display, rule: rule, group: group) {
-                    skipped += 1
-                    continue
-                }
+        if failures.isEmpty {
+            for rule in group.rules where rule.enabled && !rule.sourceValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                guard let display = displays.first(where: { $0.id == rule.displayID }) else { continue }
+                do {
+                    if await shouldSkipPresetInputSwitchForConnectedLocalDisplay(display: display, rule: rule, group: group) {
+                        skipped += 1
+                        continue
+                    }
 
-                let check = await inputSourceSkipCheck(display: display, rule: rule)
-                logger.info(check.logMessage(display: display, rule: rule))
-                if check.shouldSkip {
-                    skipped += 1
-                    continue
+                    let check = await inputSourceSkipCheck(display: display, rule: rule)
+                    logger.info(check.logMessage(display: display, rule: rule))
+                    if check.shouldSkip {
+                        skipped += 1
+                        continue
+                    }
+                    _ = try await cli.changeInputSource(display: display, sourceValue: rule.sourceValue)
+                    logger.info("Set input source: display=\(display.name), targetSourceValue=\(rule.sourceValue), targetSourceName=\(rule.sourceName)")
+                    applied += 1
+                } catch {
+                    logger.warning("Set input source failed: display=\(display.name), targetSourceValue=\(rule.sourceValue), error=\(error.localizedDescription)")
+                    failures.append("\(display.name): \(error.localizedDescription)")
                 }
-                _ = try await cli.changeInputSource(display: display, sourceValue: rule.sourceValue)
-                logger.info("Set input source: display=\(display.name), targetSourceValue=\(rule.sourceValue), targetSourceName=\(rule.sourceName)")
-                applied += 1
-            } catch {
-                logger.warning("Set input source failed: display=\(display.name), targetSourceValue=\(rule.sourceValue), error=\(error.localizedDescription)")
-                failures.append("\(display.name): \(error.localizedDescription)")
             }
+        } else {
+            logger.warning("Skipping input source switching because reconnect reported failures.")
         }
 
         let shouldDisconnect = failures.isEmpty
@@ -337,6 +339,36 @@ final class AppState: ObservableObject {
             lastError = failures.joined(separator: "\n")
             statusMessage = "\(t(.appliedWithIssues)): \(failures.count)"
         }
+    }
+
+    private func reconnectActions(for group: SwitchGroup) async -> [DisplayConnectionAction] {
+        var actions = managedDisconnectedDisplays.map {
+            DisplayConnectionAction(display: $0, operation: .reconnect, reason: t(.managedReconnectReason))
+        }
+
+        guard let kind = group.presetKind else { return actions }
+        let localOwner = localMacRole.macOwner
+
+        for rule in group.rules {
+            guard let display = displays.first(where: { $0.id == rule.displayID }) else { continue }
+            guard routeOwner(for: kind, display: display, displayIndex: displayIndex(for: display)) == localOwner else { continue }
+            guard !actions.contains(where: { $0.display.stableID == display.stableID }) else { continue }
+
+            do {
+                let isConnected = try await cli.displayConnectionStatus(display: display)
+                if !isConnected {
+                    actions.append(DisplayConnectionAction(
+                        display: display,
+                        operation: .reconnect,
+                        reason: t(.assignedToThisMacReconnectReason)
+                    ))
+                }
+            } catch {
+                logger.warning("Reconnect precheck failed: display=\(display.name), error=\(error.localizedDescription)")
+            }
+        }
+
+        return actions
     }
 
     private func shouldSkipPresetInputSwitchForConnectedLocalDisplay(display: DisplayDevice, rule: SwitchRule, group: SwitchGroup) async -> Bool {

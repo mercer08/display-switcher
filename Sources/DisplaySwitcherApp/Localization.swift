@@ -70,6 +70,7 @@ enum CopyKey: String {
     case reconnectedDisplays
     case disconnectedDisplays
     case managedReconnectReason
+    case assignedToThisMacReconnectReason
     case notAssignedToThisMacReason
     case noManagedDisconnectedDisplays
     case applyConfirmationTitle
@@ -217,6 +218,7 @@ enum Localization {
         .reconnectedDisplays: "reconnected",
         .disconnectedDisplays: "disconnected",
         .managedReconnectReason: "Restore display previously disconnected by this app",
+        .assignedToThisMacReconnectReason: "Display is assigned to this Mac",
         .notAssignedToThisMacReason: "Not assigned to",
         .noManagedDisconnectedDisplays: "No displays are currently managed as disconnected by this app.",
         .applyConfirmationTitle: "Review Strategy",
@@ -354,6 +356,7 @@ enum Localization {
         .reconnectedDisplays: "已恢复",
         .disconnectedDisplays: "已断开",
         .managedReconnectReason: "恢复之前由本应用断开的显示器",
+        .assignedToThisMacReconnectReason: "这台显示器分配给本机",
         .notAssignedToThisMacReason: "不分配给",
         .noManagedDisconnectedDisplays: "当前没有由本应用托管断开的显示器。",
         .applyConfirmationTitle: "确认策略",
