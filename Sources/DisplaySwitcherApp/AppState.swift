@@ -278,7 +278,7 @@ final class AppState: ObservableObject {
         var skipped = 0
         var failures: [String] = []
 
-        let reconnectActions = await reconnectActions(for: group)
+        let reconnectActions = await connectionActions(for: group, operation: .reconnect)
 
         if !reconnectActions.isEmpty {
             statusMessage = "\(t(.reconnectingDisplays)) \(reconnectActions.count)..."
@@ -295,6 +295,10 @@ final class AppState: ObservableObject {
                 guard let display = displays.first(where: { $0.id == rule.displayID }) else { continue }
                 do {
                     if await shouldSkipPresetInputSwitchForConnectedLocalDisplay(display: display, rule: rule, group: group) {
+                        skipped += 1
+                        continue
+                    }
+                    if await shouldSkipPresetInputSwitchForDisconnectedRemoteDisplay(display: display, rule: rule, group: group) {
                         skipped += 1
                         continue
                     }
@@ -319,7 +323,7 @@ final class AppState: ObservableObject {
 
         let shouldDisconnect = failures.isEmpty
         if shouldDisconnect {
-            let disconnectActions = disconnectActions(for: group)
+            let disconnectActions = await connectionActions(for: group, operation: .disconnect)
             if !disconnectActions.isEmpty {
                 statusMessage = "\(t(.disconnectingDisplays)) \(disconnectActions.count)..."
                 let disconnectResult = await applyConnectionActions(disconnectActions)
@@ -341,34 +345,69 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func reconnectActions(for group: SwitchGroup) async -> [DisplayConnectionAction] {
-        var actions = managedDisconnectedDisplays.map {
-            DisplayConnectionAction(display: $0, operation: .reconnect, reason: t(.managedReconnectReason))
-        }
-
-        guard let kind = group.presetKind else { return actions }
+    private func connectionActions(for group: SwitchGroup, operation: DisplayConnectionOperation) async -> [DisplayConnectionAction] {
+        guard let kind = group.presetKind else { return [] }
         let localOwner = localMacRole.macOwner
+        var actions: [DisplayConnectionAction] = []
 
         for rule in group.rules {
-            guard let display = displays.first(where: { $0.id == rule.displayID }) else { continue }
-            guard routeOwner(for: kind, display: display, displayIndex: displayIndex(for: display)) == localOwner else { continue }
+            guard let display = knownDisplay(for: rule) else { continue }
+            let isAssignedToLocal = routeOwner(for: kind, display: display, displayIndex: displayIndex(for: display)) == localOwner
+            guard shouldApplyConnectionOperation(operation, isAssignedToLocal: isAssignedToLocal) else { continue }
             guard !actions.contains(where: { $0.display.stableID == display.stableID }) else { continue }
 
-            do {
-                let isConnected = try await cli.displayConnectionStatus(display: display)
-                if !isConnected {
+            switch operation {
+            case .reconnect:
+                if managedDisconnectedDisplays.contains(where: { $0.stableID == display.stableID }) {
                     actions.append(DisplayConnectionAction(
                         display: display,
-                        operation: .reconnect,
+                        operation: operation,
                         reason: t(.assignedToThisMacReconnectReason)
                     ))
+                    continue
                 }
-            } catch {
-                logger.warning("Reconnect precheck failed: display=\(display.name), error=\(error.localizedDescription)")
+
+                do {
+                    let isConnected = try await cli.displayConnectionStatus(display: display)
+                    if !isConnected {
+                        actions.append(DisplayConnectionAction(
+                            display: display,
+                            operation: operation,
+                            reason: t(.assignedToThisMacReconnectReason)
+                        ))
+                    }
+                } catch {
+                    logger.warning("Reconnect precheck failed: display=\(display.name), error=\(error.localizedDescription)")
+                }
+            case .disconnect:
+                guard displays.contains(where: { $0.stableID == display.stableID }) else { continue }
+                guard !managedDisconnectedDisplays.contains(where: { $0.stableID == display.stableID }) else { continue }
+                actions.append(DisplayConnectionAction(
+                    display: display,
+                    operation: operation,
+                    reason: "\(t(.notAssignedToThisMacReason)) \(localMacRole.label(language: language))"
+                ))
             }
         }
 
         return actions
+    }
+
+    private func shouldApplyConnectionOperation(
+        _ operation: DisplayConnectionOperation,
+        isAssignedToLocal: Bool
+    ) -> Bool {
+        switch operation {
+        case .reconnect:
+            return isAssignedToLocal
+        case .disconnect:
+            return !isAssignedToLocal
+        }
+    }
+
+    private func knownDisplay(for rule: SwitchRule) -> DisplayDevice? {
+        displays.first { $0.id == rule.displayID }
+            ?? managedDisconnectedDisplays.first { $0.id == rule.displayID }
     }
 
     private func shouldSkipPresetInputSwitchForConnectedLocalDisplay(display: DisplayDevice, rule: SwitchRule, group: SwitchGroup) async -> Bool {
@@ -384,6 +423,23 @@ final class AppState: ObservableObject {
             return true
         } catch {
             logger.warning("Connected local preset display check failed: display=\(display.name), error=\(error.localizedDescription)")
+            return false
+        }
+    }
+
+    private func shouldSkipPresetInputSwitchForDisconnectedRemoteDisplay(display: DisplayDevice, rule: SwitchRule, group: SwitchGroup) async -> Bool {
+        guard let kind = group.presetKind else { return false }
+        guard routeOwner(for: kind, display: display, displayIndex: displayIndex(for: display)) != localMacRole.macOwner else {
+            return false
+        }
+
+        do {
+            let isConnected = try await cli.displayConnectionStatus(display: display)
+            guard !isConnected else { return false }
+            logger.info("Input source precheck skipped for disconnected remote preset display: display=\(display.name), targetSourceValue=\(rule.sourceValue), targetSourceName=\(rule.sourceName), preset=\(kind.rawValue), localMacRole=\(localMacRole.rawValue)")
+            return true
+        } catch {
+            logger.warning("Disconnected remote preset display check failed: display=\(display.name), error=\(error.localizedDescription)")
             return false
         }
     }
@@ -591,10 +647,31 @@ final class AppState: ObservableObject {
     }
 
     func connectionActionsPreview(for group: SwitchGroup) -> [DisplayConnectionAction] {
-        let reconnectActions = managedDisconnectedDisplays.map {
-            DisplayConnectionAction(display: $0, operation: .reconnect, reason: t(.managedReconnectReason))
+        guard let kind = group.presetKind else { return [] }
+        let localOwner = localMacRole.macOwner
+        var actions: [DisplayConnectionAction] = []
+
+        for rule in group.rules {
+            guard let display = knownDisplay(for: rule) else { continue }
+            let isAssignedToLocal = routeOwner(for: kind, display: display, displayIndex: displayIndex(for: display)) == localOwner
+            let isManagedDisconnected = managedDisconnectedDisplays.contains { $0.stableID == display.stableID }
+
+            if isAssignedToLocal, isManagedDisconnected {
+                actions.append(DisplayConnectionAction(
+                    display: display,
+                    operation: .reconnect,
+                    reason: t(.assignedToThisMacReconnectReason)
+                ))
+            } else if !isAssignedToLocal, !isManagedDisconnected {
+                actions.append(DisplayConnectionAction(
+                    display: display,
+                    operation: .disconnect,
+                    reason: "\(t(.notAssignedToThisMacReason)) \(localMacRole.label(language: language))"
+                ))
+            }
         }
-        return reconnectActions + disconnectActions(for: group)
+
+        return actions
     }
 
     func hotkeyRows() -> [(shortcut: String, action: String)] {
@@ -710,31 +787,6 @@ final class AppState: ObservableObject {
                 items: items,
                 summary: t(.setupCheckFailed),
                 guidance: t(.setupCheckBetterDisplayGuide)
-            )
-        }
-    }
-
-    private func disconnectActions(for group: SwitchGroup) -> [DisplayConnectionAction] {
-        guard group.presetKind?.isSplitPreset == true else { return [] }
-        guard let kind = group.presetKind else { return [] }
-        let localOwner = localMacRole.macOwner
-        let targets = displays.filter { display in
-            routeOwner(for: kind, display: display, displayIndex: displayIndex(for: display)) != localOwner
-        }
-
-        guard !targets.isEmpty else { return [] }
-
-        let remainingDisplayCount = displays.count - targets.count
-        if remainingDisplayCount < 1 {
-            logger.warning("Skipping display disconnect because it would leave no external displays connected for this Mac.")
-            return []
-        }
-
-        return targets.map { display in
-            DisplayConnectionAction(
-                display: display,
-                operation: .disconnect,
-                reason: "\(t(.notAssignedToThisMacReason)) \(localMacRole.label(language: language))"
             )
         }
     }
