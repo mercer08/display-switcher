@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import Foundation
 import SwiftUI
 
@@ -846,7 +847,7 @@ final class AppState: ObservableObject {
         language = configuration.language
         theme = configuration.theme
         visibleSourceCategories = configuration.visibleSourceCategories
-        localMacRole = configuration.localMacRole
+        localMacRole = Self.hardwareDetectedLocalMacRole() ?? configuration.localMacRole
         managedDisconnectedDisplays = configuration.managedDisconnectedDisplays
         groups = normalizePresetGroups(migratePresetGroups(configuration.groups))
         statusMessage = t(.ready)
@@ -855,11 +856,78 @@ final class AppState: ObservableObject {
     }
 
     private static func detectedLocalMacRole() -> LocalMacRole {
+        if let hardwareRole = hardwareDetectedLocalMacRole() {
+            return hardwareRole
+        }
+
         let hostName = (Host.current().localizedName ?? Host.current().name ?? "").lowercased()
         if hostName.contains("mini") || hostName.contains("personal") || hostName.contains("个人") {
             return .personal
         }
         return .work
+    }
+
+    private static func hardwareDetectedLocalMacRole() -> LocalMacRole? {
+        let machineName = hardwareMachineName().lowercased()
+        if machineName.contains("mac mini") {
+            return .personal
+        }
+        if machineName.contains("macbook pro") {
+            return .work
+        }
+
+        let model = hardwareModelIdentifier().lowercased()
+        if model.contains("macmini") {
+            return .personal
+        }
+        if model.contains("macbookpro") {
+            return .work
+        }
+        return nil
+    }
+
+    private static func hardwareMachineName() -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
+        process.arguments = ["SPHardwareDataType", "-json"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return ""
+        }
+
+        guard process.terminationStatus == 0 else { return "" }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let hardwareItems = object["SPHardwareDataType"] as? [[String: Any]],
+            let machineName = hardwareItems.first?["machine_name"] as? String
+        else {
+            return ""
+        }
+
+        return machineName
+    }
+
+    private static func hardwareModelIdentifier() -> String {
+        var size = 0
+        guard sysctlbyname("hw.model", nil, &size, nil, 0) == 0, size > 0 else {
+            return ""
+        }
+
+        var buffer = [CChar](repeating: 0, count: size)
+        guard sysctlbyname("hw.model", &buffer, &size, nil, 0) == 0 else {
+            return ""
+        }
+
+        let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        return String(decoding: bytes, as: UTF8.self)
     }
 
     private func saveConfiguration() {
