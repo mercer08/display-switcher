@@ -93,6 +93,7 @@ final class AppState: ObservableObject {
         isRefreshing = true
         lastError = nil
         statusMessage = t(.refreshingDisplays)
+        logger.info("Refresh displays started")
         defer { isRefreshing = false }
 
         do {
@@ -111,17 +112,24 @@ final class AppState: ObservableObject {
             }
 
             statusMessage = fetchedDisplays.isEmpty ? t(.noBetterDisplayDisplays) : "\(t(.foundDisplays)) \(localizedDisplayCount(fetchedDisplays.count))"
+            logger.info("Refresh displays finished: count=\(fetchedDisplays.count)")
         } catch {
             lastError = error.localizedDescription
             statusMessage = t(.refreshFailed)
+            logger.warning("Refresh displays failed: \(error.localizedDescription)")
         }
     }
 
     func refreshInputSources(for displays: [DisplayDevice]) async throws {
         var mapping: [String: [InputSource]] = [:]
         for display in displays {
-            let sources = try await cli.listInputSources(for: display)
-            mapping[display.id] = sources
+            do {
+                let sources = try await cli.listInputSources(for: display)
+                mapping[display.id] = sources
+            } catch {
+                mapping[display.id] = []
+                logger.warning("Input source refresh failed: display=\(display.name), id=\(display.stableID), error=\(error.localizedDescription)")
+            }
         }
         inputSourcesByDisplayID = mapping
     }
