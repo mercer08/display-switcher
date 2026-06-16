@@ -127,7 +127,7 @@ final class AppState: ObservableObject {
                 let sources = try await cli.listInputSources(for: display)
                 mapping[display.id] = sources
             } catch {
-                mapping[display.id] = []
+                mapping[display.id] = inputSourcesByDisplayID[display.id] ?? []
                 logger.warning("Input source refresh failed: display=\(display.name), id=\(display.stableID), error=\(error.localizedDescription)")
             }
         }
@@ -929,12 +929,12 @@ final class AppState: ObservableObject {
     private func presetRule(for display: DisplayDevice, owner: MacOwner, enabled: Bool = true, existingID: UUID = UUID()) -> SwitchRule {
         let hint = preferredSourceHint(for: display, owner: owner)
         let source = preferredSource(for: display, matching: hint) ?? inputSources(for: display).first
-        let sourceName = source?.name ?? hint
+        let sourceName = source?.name ?? canonicalSourceName(for: hint)
         return SwitchRule(
             id: existingID,
             displayID: display.id,
             displayName: display.name,
-            sourceValue: source?.value ?? "",
+            sourceValue: source?.value ?? canonicalSourceValue(for: hint),
             sourceName: sourceName,
             enabled: enabled,
             sourceDeviceName: owner.displayName(language: language),
