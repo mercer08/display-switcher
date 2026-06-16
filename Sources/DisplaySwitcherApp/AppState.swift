@@ -295,6 +295,11 @@ final class AppState: ObservableObject {
         for rule in group.rules where rule.enabled && !rule.sourceValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             guard let display = displays.first(where: { $0.id == rule.displayID }) else { continue }
             do {
+                if await shouldSkipPresetInputSwitchForConnectedLocalDisplay(display: display, rule: rule, group: group) {
+                    skipped += 1
+                    continue
+                }
+
                 let check = await inputSourceSkipCheck(display: display, rule: rule)
                 logger.info(check.logMessage(display: display, rule: rule))
                 if check.shouldSkip {
@@ -331,6 +336,23 @@ final class AppState: ObservableObject {
         } else {
             lastError = failures.joined(separator: "\n")
             statusMessage = "\(t(.appliedWithIssues)): \(failures.count)"
+        }
+    }
+
+    private func shouldSkipPresetInputSwitchForConnectedLocalDisplay(display: DisplayDevice, rule: SwitchRule, group: SwitchGroup) async -> Bool {
+        guard let kind = group.presetKind else { return false }
+        guard routeOwner(for: kind, display: display, displayIndex: displayIndex(for: display)) == localMacRole.macOwner else {
+            return false
+        }
+
+        do {
+            let isConnected = try await cli.displayConnectionStatus(display: display)
+            guard isConnected else { return false }
+            logger.info("Input source precheck skipped for connected local preset display: display=\(display.name), targetSourceValue=\(rule.sourceValue), targetSourceName=\(rule.sourceName), preset=\(kind.rawValue), localMacRole=\(localMacRole.rawValue)")
+            return true
+        } catch {
+            logger.warning("Connected local preset display check failed: display=\(display.name), error=\(error.localizedDescription)")
+            return false
         }
     }
 

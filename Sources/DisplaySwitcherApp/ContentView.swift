@@ -236,6 +236,13 @@ private struct TopBar: View {
 private struct DisplayOverview: View {
     @EnvironmentObject private var appState: AppState
 
+    private var displayColumns: [GridItem] {
+        [
+            GridItem(.flexible(minimum: 270), spacing: 12),
+            GridItem(.flexible(minimum: 270), spacing: 12)
+        ]
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: appState.t(.displays), systemImage: "display")
@@ -247,18 +254,26 @@ private struct DisplayOverview: View {
                     subtitle: appState.t(.noDisplaysSubtitle)
                 )
             } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 270), spacing: 12)], spacing: 12) {
+                LazyVGrid(columns: displayColumns, spacing: 12) {
                     ForEach(appState.displays) { display in
-                        DisplayCard(display: display)
+                        if isManagedDisconnected(display) {
+                            ManagedDisconnectedDisplayCard(display: display)
+                        } else {
+                            DisplayCard(display: display)
+                        }
                     }
                     ForEach(appState.managedDisconnectedDisplays.filter { disconnected in
-                        !appState.displays.contains { $0.id == disconnected.id }
+                        !appState.displays.contains { $0.stableID == disconnected.stableID }
                     }) { display in
                         ManagedDisconnectedDisplayCard(display: display)
                     }
                 }
             }
         }
+    }
+
+    private func isManagedDisconnected(_ display: DisplayDevice) -> Bool {
+        appState.managedDisconnectedDisplays.contains { $0.stableID == display.stableID }
     }
 }
 
@@ -306,6 +321,7 @@ private struct DisplayCard: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 156)
             .background(RoundedRectangle(cornerRadius: 8).fill(AppColors.cardBackground))
             .overlay {
                 RoundedRectangle(cornerRadius: 8)
@@ -364,6 +380,7 @@ private struct ManagedDisconnectedDisplayCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: 156)
         .background(RoundedRectangle(cornerRadius: 8).fill(AppColors.cardBackground))
         .overlay {
             RoundedRectangle(cornerRadius: 8)
