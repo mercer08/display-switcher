@@ -290,7 +290,7 @@ private struct DisplayCard: View {
                     Image(systemName: "display")
                         .font(.system(size: 24, weight: .medium))
                         .foregroundStyle(.teal)
-                        .frame(width: 42, height: 42)
+                        .frame(width: 48, height: 48)
                         .background(RoundedRectangle(cornerRadius: 8).fill(Color.teal.opacity(0.12)))
 
                     Spacer()
@@ -305,7 +305,7 @@ private struct DisplayCard: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(display.name)
-                        .font(.system(size: 17, weight: .bold))
+                        .font(.system(size: 19, weight: .bold))
                         .lineLimit(1)
                     Text(display.shortIdentity)
                         .font(.caption)
@@ -313,15 +313,17 @@ private struct DisplayCard: View {
                         .lineLimit(1)
                 }
 
+                Spacer(minLength: 2)
+
                 VStack(alignment: .leading, spacing: 6) {
                     InfoLine(title: appState.t(.product), value: display.productName ?? display.originalName ?? display.name)
                     InfoLine(title: appState.t(.vendorModel), value: compactPair(display.vendor, display.model))
                     InfoLine(title: appState.t(.made), value: display.manufactureSummary)
                 }
             }
-            .padding(14)
+            .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 156)
+            .frame(height: 188)
             .background(RoundedRectangle(cornerRadius: 8).fill(AppColors.cardBackground))
             .overlay {
                 RoundedRectangle(cornerRadius: 8)
@@ -349,7 +351,7 @@ private struct ManagedDisconnectedDisplayCard: View {
                 Image(systemName: "display.trianglebadge.exclamationmark")
                     .font(.system(size: 24, weight: .medium))
                     .foregroundStyle(.orange)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 48, height: 48)
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.orange.opacity(0.12)))
 
                 Spacer()
@@ -364,7 +366,7 @@ private struct ManagedDisconnectedDisplayCard: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(display.name)
-                    .font(.system(size: 17, weight: .bold))
+                    .font(.system(size: 19, weight: .bold))
                     .lineLimit(1)
                 Text(display.shortIdentity)
                     .font(.caption)
@@ -372,15 +374,17 @@ private struct ManagedDisconnectedDisplayCard: View {
                     .lineLimit(1)
             }
 
+            Spacer(minLength: 2)
+
             VStack(alignment: .leading, spacing: 6) {
                 InfoLine(title: appState.t(.product), value: display.productName ?? display.originalName ?? display.name)
                 InfoLine(title: appState.t(.vendorModel), value: compactPair(display.vendor, display.model))
                 InfoLine(title: appState.t(.made), value: display.manufactureSummary)
             }
         }
-        .padding(14)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: 156)
+        .frame(height: 188)
         .background(RoundedRectangle(cornerRadius: 8).fill(AppColors.cardBackground))
         .overlay {
             RoundedRectangle(cornerRadius: 8)
