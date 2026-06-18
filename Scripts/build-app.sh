@@ -5,6 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Display Switcher"
 BUNDLE_ID="dev.local.display-switcher"
 APP_DIR="$ROOT_DIR/build/$APP_NAME.app"
+INSTALL_DIR="${INSTALL_DIR:-/Applications}"
+INSTALLED_APP="$INSTALL_DIR/$APP_NAME.app"
 EXECUTABLE="$ROOT_DIR/.build/release/DisplaySwitcher"
 VERSION="${APP_VERSION:-0.1.0}"
 BUILD_NUMBER="${BUILD_NUMBER:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
@@ -64,3 +66,18 @@ echo "Built: $APP_DIR"
 echo "Version: $VERSION ($BUILD_NUMBER)"
 echo "Build time: $BUILD_TIME"
 echo "Git commit: $GIT_COMMIT"
+
+install_app() {
+  rm -rf "$INSTALLED_APP"
+  /usr/bin/ditto "$APP_DIR" "$INSTALLED_APP"
+}
+
+if [[ "${INSTALL_APP:-1}" == "1" ]]; then
+  if [[ -w "$INSTALL_DIR" ]]; then
+    install_app
+  else
+    sudo rm -rf "$INSTALLED_APP"
+    sudo /usr/bin/ditto "$APP_DIR" "$INSTALLED_APP"
+  fi
+  echo "Installed: $INSTALLED_APP"
+fi

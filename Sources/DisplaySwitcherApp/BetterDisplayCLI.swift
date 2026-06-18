@@ -2,6 +2,7 @@ import Foundation
 
 enum BetterDisplayError: LocalizedError {
     case executableNotFound
+    case builtInDisplayUnsupported(String)
     case commandFailed(String)
     case invalidOutput(String)
 
@@ -9,6 +10,8 @@ enum BetterDisplayError: LocalizedError {
         switch self {
         case .executableNotFound:
             return "betterdisplaycli was not found. Install it with: brew install waydabber/betterdisplay/betterdisplaycli"
+        case .builtInDisplayUnsupported(let name):
+            return "Built-in display is excluded from display switching: \(name)"
         case .commandFailed(let message):
             return message
         case .invalidOutput(let message):
@@ -51,6 +54,7 @@ struct BetterDisplayCLI {
     func listInputSources(for display: DisplayDevice?) async throws -> [InputSource] {
         var arguments = ["get"]
         if let display {
+            try validateSwitchable(display)
             arguments.append(identifierArgument(for: display))
         }
         arguments.append("--inputSourceList")
@@ -59,7 +63,8 @@ struct BetterDisplayCLI {
     }
 
     func changeInputSource(display: DisplayDevice, sourceValue: String) async throws -> String {
-        try await run([
+        try validateSwitchable(display)
+        return try await run([
             "perform",
             identifierArgument(for: display),
             "--changeInputSource=\(sourceValue)"
@@ -67,7 +72,8 @@ struct BetterDisplayCLI {
     }
 
     func setDisplayConnection(display: DisplayDevice, connected: Bool) async throws -> String {
-        try await run([
+        try validateSwitchable(display)
+        return try await run([
             "set",
             identifierArgument(for: display),
             "--connected=\(connected ? "on" : "off")"
@@ -75,6 +81,7 @@ struct BetterDisplayCLI {
     }
 
     func displayConnectionStatus(display: DisplayDevice) async throws -> Bool {
+        try validateSwitchable(display)
         let raw = try await run([
             "get",
             identifierArgument(for: display),
@@ -84,6 +91,7 @@ struct BetterDisplayCLI {
     }
 
     func currentInputSourceVCPValue(display: DisplayDevice) async throws -> CurrentInputSourceVCPValue {
+        try validateSwitchable(display)
         let raw = try await run([
             "get",
             identifierArgument(for: display),
@@ -112,6 +120,12 @@ struct BetterDisplayCLI {
             return "--UUID=\(uuid)"
         }
         return "--name=\(display.name)"
+    }
+
+    private func validateSwitchable(_ display: DisplayDevice) throws {
+        guard !display.isBuiltIn else {
+            throw BetterDisplayError.builtInDisplayUnsupported(display.name)
+        }
     }
 
     private func run(_ arguments: [String]) async throws -> String {
@@ -179,29 +193,30 @@ struct BetterDisplayCLI {
     }
 
     private func isBuiltInDisplay(_ object: [String: String]) -> Bool {
-        let searchableText = [
-            object["name"],
-            object["originalName"],
-            object["productName"],
-            object["model"],
-            object["registryLocation"]
-        ]
-            .compactMap { $0?.lowercased() }
+        let hasBuiltInBooleanFlag = object.contains { key, value in
+            let normalizedKey = key.lowercased().filter(\.isLetter)
+            let normalizedValue = value.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            return ["isbuiltin", "builtin", "isinternal", "internal"].contains(normalizedKey)
+                && ["true", "yes", "on", "1"].contains(normalizedValue)
+        }
+        guard !hasBuiltInBooleanFlag else { return true }
+
+        let hasBuiltInType = object.contains { key, value in
+            let normalizedKey = key.lowercased().filter(\.isLetter)
+            let normalizedValue = value.lowercased().filter(\.isLetter)
+            return (normalizedKey.contains("type") || normalizedKey.contains("class"))
+                && ["builtin", "builtindisplay", "internal", "internaldisplay"].contains(normalizedValue)
+        }
+        guard !hasBuiltInType else { return true }
+
+        // BetterDisplay versions have used different keys for display type. Search all
+        // identifier values so explicit values such as "Built-in" are never missed.
+        let searchableText = object.values
             .joined(separator: " ")
+            .lowercased()
+            .filter(\.isLetter)
 
-        let builtInMarkers = [
-            "built-in",
-            "built in",
-            "builtin",
-            "internal display",
-            "color lcd",
-            "liquid retina",
-            "retina display",
-            "applebacklightdisplay",
-            "appleclcd"
-        ]
-
-        return builtInMarkers.contains { searchableText.contains($0) }
+        return DisplayDevice.builtInDisplayMarkers.contains { searchableText.contains($0) }
     }
 
     private func parseInputSources(_ raw: String) -> [InputSource] {

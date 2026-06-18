@@ -100,6 +100,34 @@ struct DisplayDevice: Identifiable, Codable, Hashable {
         }
         return yearOfManufacture
     }
+
+    var isBuiltIn: Bool {
+        let searchableText = [
+            name,
+            originalName,
+            productName,
+            model,
+            registryLocation
+        ]
+            .compactMap { $0 }
+            .joined(separator: " ")
+            .lowercased()
+            .filter(\.isLetter)
+
+        return Self.builtInDisplayMarkers.contains { searchableText.contains($0) }
+    }
+
+    static let builtInDisplayMarkers = [
+        "builtin",
+        "internaldisplay",
+        "colorlcd",
+        "liquidretina",
+        "retinadisplay",
+        "applebacklightdisplay",
+        "appleclcd",
+        "macbookprodisplay",
+        "macbookairdisplay"
+    ]
 }
 
 struct InputSource: Identifiable, Codable, Hashable {

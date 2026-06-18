@@ -47,8 +47,11 @@ Build a macOS app bundle:
 ```sh
 chmod +x Scripts/build-app.sh
 Scripts/build-app.sh
-open "build/Display Switcher.app"
+open "/Applications/Display Switcher.app"
 ```
+
+The build script installs the finished bundle into `/Applications` by default. Use
+`INSTALL_APP=0 Scripts/build-app.sh` when you only want the bundle under `build/`.
 
 Configuration is saved at:
 

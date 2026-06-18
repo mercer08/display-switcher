@@ -103,7 +103,7 @@ final class AppState: ObservableObject {
 
         do {
             guard cli.isAvailable() else { throw BetterDisplayError.executableNotFound }
-            let fetchedDisplays = try await cli.listDisplays()
+            let fetchedDisplays = try await cli.listDisplays().filter { !$0.isBuiltIn }
             displays = fetchedDisplays
             selectedDisplayID = selectedDisplayID ?? fetchedDisplays.first?.id
             try await refreshInputSources(for: fetchedDisplays)
@@ -127,7 +127,7 @@ final class AppState: ObservableObject {
 
     func refreshInputSources(for displays: [DisplayDevice]) async throws {
         var mapping: [String: [InputSource]] = [:]
-        for display in displays {
+        for display in displays where !display.isBuiltIn {
             do {
                 let sources = try await cli.listInputSources(for: display)
                 mapping[display.id] = sources
@@ -294,6 +294,11 @@ final class AppState: ObservableObject {
         if failures.isEmpty {
             for rule in group.rules where rule.enabled && !rule.sourceValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 guard let display = displays.first(where: { $0.id == rule.displayID }) else { continue }
+                guard !display.isBuiltIn else {
+                    logger.info("Skipping built-in display rule: display=\(display.name)")
+                    skipped += 1
+                    continue
+                }
                 do {
                     if await shouldSkipPresetInputSwitchForConnectedLocalDisplay(display: display, rule: rule, group: group) {
                         skipped += 1
@@ -353,6 +358,7 @@ final class AppState: ObservableObject {
 
         for rule in group.rules {
             guard let display = knownDisplay(for: rule) else { continue }
+            guard !display.isBuiltIn else { continue }
             let isAssignedToLocal = routeOwner(for: kind, display: display, displayIndex: displayIndex(for: display)) == localOwner
             guard shouldApplyConnectionOperation(operation, isAssignedToLocal: isAssignedToLocal) else { continue }
             guard !actions.contains(where: { $0.display.stableID == display.stableID }) else { continue }
@@ -447,6 +453,10 @@ final class AppState: ObservableObject {
 
     func applySingle(display: DisplayDevice, source: InputSource) async {
         guard !isApplying else { return }
+        guard !display.isBuiltIn else {
+            logger.info("Ignoring single-display switch for built-in display: display=\(display.name)")
+            return
+        }
         isApplying = true
         lastError = nil
         statusMessage = "\(t(.switchingDisplay)) \(display.name) -> \(source.name)..."
@@ -654,6 +664,7 @@ final class AppState: ObservableObject {
 
         for rule in group.rules {
             guard let display = knownDisplay(for: rule) else { continue }
+            guard !display.isBuiltIn else { continue }
             let isAssignedToLocal = routeOwner(for: kind, display: display, displayIndex: displayIndex(for: display)) == localOwner
             let isManagedDisconnected = managedDisconnectedDisplays.contains { $0.stableID == display.stableID }
 
@@ -797,6 +808,10 @@ final class AppState: ObservableObject {
         var failures: [String] = []
 
         for action in actions {
+            guard !action.display.isBuiltIn else {
+                logger.info("Skipping built-in display connection action: display=\(action.display.name)")
+                continue
+            }
             do {
                 _ = try await cli.setDisplayConnection(display: action.display, connected: action.operation == .reconnect)
                 updateManagedDisconnectedDisplays(for: action)
@@ -829,7 +844,7 @@ final class AppState: ObservableObject {
     private func reloadDisplaysAfterConnectionChange() async {
         try? await Task.sleep(nanoseconds: 1_200_000_000)
         do {
-            let fetchedDisplays = try await cli.listDisplays()
+            let fetchedDisplays = try await cli.listDisplays().filter { !$0.isBuiltIn }
             displays = fetchedDisplays
             selectedDisplayID = fetchedDisplays.first { $0.id == selectedDisplayID }?.id ?? fetchedDisplays.first?.id
             try await refreshInputSources(for: fetchedDisplays)
@@ -848,7 +863,7 @@ final class AppState: ObservableObject {
         theme = configuration.theme
         visibleSourceCategories = configuration.visibleSourceCategories
         localMacRole = Self.hardwareDetectedLocalMacRole() ?? configuration.localMacRole
-        managedDisconnectedDisplays = configuration.managedDisconnectedDisplays
+        managedDisconnectedDisplays = configuration.managedDisconnectedDisplays.filter { !$0.isBuiltIn }
         groups = normalizePresetGroups(migratePresetGroups(configuration.groups))
         statusMessage = t(.ready)
         selectedGroupID = groups.first?.id
